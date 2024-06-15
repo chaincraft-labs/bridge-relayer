@@ -1,0 +1,40 @@
+[environment]
+mode = "prod"
+
+[relayer_blockchain]
+    
+    # [relayer_blockchain.ChainId441]
+    # rpc_url = "https://harmonie-endpoint-02.allfeat.io/"
+    # project_id = "{{ PROJECT_ID_441 }}"
+    # pk = "{{ PK_441 }}"
+    # wait_block_validation = 3
+    # smart_contract_address = "0xe13ab9d8Ee50969341d6E2D7bD945e4d6f6D0a1E"
+    # genesis_block = 1009723
+    # client = ""
+
+    [relayer_blockchain.ChainId441]
+    rpc_url = "https://harmonie-endpoint-02.allfeat.io/"
+    project_id = "{{ PROJECT_ID_441 }}"
+    pk = "{{ PK_441 }}"
+    wait_block_validation = 2
+    smart_contract_address = "0x9609CeF4e2B2BeC75EC1FE347a5ACaF5CAE979EE"
+    genesis_block = 1009723
+    client = ""
+    
+    [relayer_blockchain.ChainId11155111]
+    rpc_url = "https://eth-sepolia.g.alchemy.com/v2/"
+    project_id = "{{ PROJECT_ID_11155111 }}"
+    pk = "{{ PK_11155111 }}"
+    wait_block_validation = 2
+    smart_contract_address = "0xda0a222eA8342F501080BE030Bc4b990FcC85623"
+    genesis_block = 6106406
+    client = "middleware"
+
+
+[relayer_register]
+# RabbitMQ Broker 
+host = "localhost"
+port = 5672
+user = "guest"
+password = "{{ RELAYER_REGISTER_PASSWORD }}"
+queue_name = "bridge.relayer.prod"

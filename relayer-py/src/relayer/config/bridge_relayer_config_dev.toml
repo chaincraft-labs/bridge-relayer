@@ -1,0 +1,58 @@
+[environment]
+mode = "dev"
+
+[relayer_blockchain]
+    
+    [relayer_blockchain.ChainId80002]
+    rpc_url = "https://polygon-amoy.g.alchemy.com/v2/"
+    project_id = "{{ PROJECT_ID_80002 }}"
+    pk = "{{ PK_80002 }}"
+    wait_block_validation = 6
+    smart_contract_address = "0x6dC7CfE7Ce3c4d071fABC7B616E94fBba361B212"
+    genesis_block = 8267279
+    client = "middleware"
+    
+    [relayer_blockchain.ChainId411]
+    rpc_url = "https://polygon-amoy.g.alchemy.com/v2/"
+    project_id = "{{ PROJECT_ID_411 }}"
+    pk = "{{ PK_411 }}"
+    wait_block_validation = 6
+    smart_contract_address = "0x59043E352D80B5FDaE9f72e09Db06A7b92913d9E"
+    genesis_block = 8300960
+    client = "middleware"
+    
+    [relayer_blockchain.ChainId441]
+    rpc_url = "https://harmonie-endpoint-02.allfeat.io/"
+    project_id = "{{ PROJECT_ID_441 }}"
+    pk = "{{ PK_441 }}"
+    wait_block_validation = 6
+    smart_contract_address = "0x55e05213724f97c5C1ee976B5a219a7eB54EE1F1"
+    genesis_block = 1015519
+    client = ""
+
+    # [relayer_blockchain.ChainId441]
+    # rpc_url = "https://harmonie-endpoint-02.allfeat.io/"
+    # project_id = "{{ PROJECT_ID_441 }}"
+    # pk = "{{ PK_441 }}"
+    # wait_block_validation = 6
+    # smart_contract_address = "0x58b7324824EBd640faE46f7A6c8Bc8Eb4a9Bc44a"
+    # genesis_block = 8267279
+    # client = ""
+
+    [relayer_blockchain.ChainId123]
+    rpc_url = "https://fake.rpc_url.org"
+    project_id = "{{ PROJECT_ID_123 }}"
+    pk = "{{ PK_123 }}"
+    wait_block_validation = 6
+        smart_contract_address = "0x1234567890abcdef1234567890abcdef12345678"
+    genesis_block = 123456789
+    client = "middleware"
+
+
+[relayer_register]
+# RabbitMQ Broker 
+host = "localhost"
+port = 5672
+user = "guest"
+password = "{{ RELAYER_REGISTER_PASSWORD }}"
+queue_name = "bridge.relayer.dev"
