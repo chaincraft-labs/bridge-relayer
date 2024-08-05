@@ -294,10 +294,7 @@ class ConsumeEventTask(BaseApp):
             func_name (str): The function name
             params (dict): Parameters
         """
-        bridge_task_dto = BridgeTaskDTO(
-            func_name=func_name,
-            params=params
-        )
+        bridge_task_dto = BridgeTaskDTO(func_name=func_name, params=params)
         self.rb_provider.set_chain_id(chain_id=chain_id)
         app = ExecuteContractTask(
             relayer_blockchain_provider=self.rb_provider,
@@ -350,7 +347,7 @@ class ConsumeEventTask(BaseApp):
         operation_hash: str = event_dto.data['operationHash']
         event_name: str = event_dto.name
 
-        self.print_log("receiveEvent", f"Received event={event_dto.as_dict()}")
+        self.print_log("receiveEvent", f"Consume event={event_dto.as_dict()}")
 
         if event_name in ['OperationCreated', 'FeesLockedConfirmed']:
             # Store event data

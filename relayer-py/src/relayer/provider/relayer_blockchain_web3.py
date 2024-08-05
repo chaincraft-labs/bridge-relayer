@@ -64,10 +64,8 @@ class RelayerBlockchainProvider(RelayerLogging, IRelayerBlockchain):
         Args:
             chain_id (int): The chain id
         """
-        self.logger.info("Set chain id")
-
         self.chain_id = chain_id
-        self.logger.debug(f"chain_id={chain_id}")
+        self.logger.debug(f"Set chain_id={chain_id}")
 
         self.relay_blockchain_config = get_blockchain_config(self.chain_id)
         self.logger.debug(
@@ -81,12 +79,11 @@ class RelayerBlockchainProvider(RelayerLogging, IRelayerBlockchain):
         Args:
             events (List[str]): The events list to filter.
         """
-        self.logger.info("Set event filter")
+        self.logger.debug(f"Set event filter with events={events}")
 
         if not isinstance(events, list):
             raise BridgeRelayerEventsFilterTypeError(
-                "'events' not a list!"
-            )
+                f"events '{events}' is not a list!")
         
         self.event_filter = events
 
@@ -96,11 +93,9 @@ class RelayerBlockchainProvider(RelayerLogging, IRelayerBlockchain):
 
         Returns:
             (int): The block number
-        """
-        self.logger.info('Get block number')
-        
+        """        
         block_data: BlockData = await self._get_block_data()
-        self.logger.debug(f'block_data.number={block_data.number}')
+        self.logger.debug(f'Get block_data.number={block_data.number}')
 
         return block_data.number # type: ignore
 
@@ -115,23 +110,18 @@ class RelayerBlockchainProvider(RelayerLogging, IRelayerBlockchain):
             poll_interval int: The loop poll interval in second
                 Default is 2
         """
-        self.logger.info('Listens events')
-
         try:
             loop: asyncio.AbstractEventLoop = asyncio.new_event_loop()
             self.logger.debug(f"loop={loop}")
         
-            event_filter: List[AsyncLogFilter] = self._execute_event_filters()
-            self.logger.debug(f"event_filter={event_filter}")
+            async_log_filter: List[AsyncLogFilter] = self._execute_event_filters()
+            self.logger.debug(f"async_log_filter={async_log_filter}")
 
             loop_events: List[Coroutine[Any, Any, NoReturn]] = [
                 self._log_loop(event, poll_interval, callback)
-                for event in event_filter
+                for event in async_log_filter
             ]
             self.logger.debug(f"loop_events={loop_events}")
-
-            # loop: asyncio.AbstractEventLoop = asyncio.new_event_loop()
-            # self.logger.debug(f"loop={loop}")
 
             asyncio.set_event_loop(loop)
             loop.run_until_complete(asyncio.gather(*loop_events))
@@ -158,13 +148,13 @@ class RelayerBlockchainProvider(RelayerLogging, IRelayerBlockchain):
         result = BridgeTaskResult()
 
         try:
-            self.logger.info(f"Call smart contract's function {bridge_task_dto}!")
-            self.logger.info(f"Client version : {await self.client_version()}!")
+            self.logger.debug(f"Call smart contract's function {bridge_task_dto}!")
+            self.logger.debug(f"Client version : {await self.client_version()}!")
 
             pk: str = self.relay_blockchain_config.pk
             
             account: LocalAccount = self.w3.eth.account.from_key(pk)
-            self.logger.debug(f"account={account}")
+            self.logger.debug(f"account={account.address}")
 
             nonce: Nonce = await self._get_nonce(account=account)
             self.logger.debug(f"nonce={nonce}")
@@ -219,7 +209,7 @@ class RelayerBlockchainProvider(RelayerLogging, IRelayerBlockchain):
         Returns:
             None
         """
-        self.logger.info("Connect to client provider")
+        self.logger.debug("Connect to client provider")
 
         self.w3 = self._set_provider()
         self.w3_contract = self._set_contract()
@@ -230,11 +220,9 @@ class RelayerBlockchainProvider(RelayerLogging, IRelayerBlockchain):
         Returns:
             str: the client version
         """
-        self.logger.info("Get the client version")
-
         try:
             client_version = await self.w3.client_version
-            self.logger.debug(f"client_version={client_version}")
+            self.logger.debug(f"Get client_version={client_version}")
             return client_version
         except Exception as e:
             self.logger.error(f"Fail getting client version! Error={e}")
@@ -254,8 +242,6 @@ class RelayerBlockchainProvider(RelayerLogging, IRelayerBlockchain):
         Returns:
             AsyncWeb3: A provider instance
         """
-        self.logger.info('Set the w3 provider instance')
-
         w3 = AsyncWeb3(AsyncHTTPProvider(
             f"{self.relay_blockchain_config.rpc_url}"\
             f"{self.relay_blockchain_config.project_id}"
@@ -263,7 +249,7 @@ class RelayerBlockchainProvider(RelayerLogging, IRelayerBlockchain):
 
         if self.relay_blockchain_config.client == "middleware":
             w3.middleware_onion.inject(async_geth_poa_middleware, layer=0)
-        self.logger.debug(f'w3={w3}')
+        self.logger.debug(f'Set the w3 provider instance w3={w3}')
 
         return w3
 
@@ -273,7 +259,7 @@ class RelayerBlockchainProvider(RelayerLogging, IRelayerBlockchain):
         Returns:
             AsyncContract: A contract instance.
         """
-        self.logger.info('Set the w3 contract instance')
+        self.logger.debug('Set the w3 contract instance')
 
         return self.w3.eth.contract(
             AsyncWeb3.to_checksum_address(
@@ -296,13 +282,17 @@ class RelayerBlockchainProvider(RelayerLogging, IRelayerBlockchain):
         Returns:
             List[Coroutine]: The list of event filter
         """
-        self.logger.info('Create the event filters list')
+        self.logger.debug('Create the event filters list')
+        self.logger.debug(f'event_filter={self.event_filter}')
 
-        return [
+        event_filters_coroutine = [
             event.create_filter(fromBlock="latest")
             for event in self.w3_contract.events # type: ignore
             if event.event_name in self.event_filter
         ]
+        self.logger.debug(f'event_filters_coroutine={event_filters_coroutine}')
+
+        return event_filters_coroutine
 
     def _execute_event_filters(self) -> List[AsyncLogFilter]:
         """Execute the coroutine event filters.
@@ -310,12 +300,15 @@ class RelayerBlockchainProvider(RelayerLogging, IRelayerBlockchain):
         Returns:
             List[AsyncLogFilter]: A list of event filter log
         """
-        self.logger.info('Execute the event filters')
+        self.logger.debug('Execute the event filters')
 
-        return [
+        async_log_filters = [
             asyncio.run(event_filter)
             for event_filter in self._create_event_filters()
         ]
+        self.logger.debug(f"async_log_filters={async_log_filters}")
+
+        return async_log_filters
 
     def create_event_dto(self, event: AttributeDict) -> EventDTO:
         """Create a Event DTO from the event.
@@ -326,9 +319,10 @@ class RelayerBlockchainProvider(RelayerLogging, IRelayerBlockchain):
         Returns:
             EventDTO: The event DTO
         """
-        self.logger.info('Create event DTO')
+        event_dto = EventDTO(name=event.event, data=event.args)
+        self.logger.debug(f'Create event DTO={event_dto}')
 
-        return EventDTO(name=event.event, data=event.args)
+        return event_dto
 
     def _handle_event(self, event: AttributeDict, callback: Callable) -> None:
         """Handle the event.
@@ -340,9 +334,7 @@ class RelayerBlockchainProvider(RelayerLogging, IRelayerBlockchain):
             event (AttributeDict): The event received from blockchain
             callback (Callable): A callback function
         """
-        self.logger.info('Handle the event')
-        self.logger.debug(f'event={event}')
-
+        self.logger.debug(f'Handle event={event}')
         event_dto: EventDTO = self.create_event_dto(event)
         self.logger.debug(f'event_dto={event_dto}')
 
@@ -384,7 +376,7 @@ class RelayerBlockchainProvider(RelayerLogging, IRelayerBlockchain):
         Returns:
             NoReturn
         """
-        self.logger.info(f"Listen to event {event_filter}!")
+        self.logger.debug(f"Listen to event {event_filter}!")
 
         while True:
             await self._loop_handle_event(
@@ -407,8 +399,7 @@ class RelayerBlockchainProvider(RelayerLogging, IRelayerBlockchain):
         Returns:
             Nonce: A nonce (int)
         """
-        self.logger.info("Get nonce for address")
-        self.logger.debug(f"address={account.address}!")
+        self.logger.debug(f"Get nonce for address={account.address}!")
 
         nonce = await self.w3.eth.get_transaction_count(account.address)
         self.logger.debug(f"result: nonce={nonce}!")
@@ -427,8 +418,7 @@ class RelayerBlockchainProvider(RelayerLogging, IRelayerBlockchain):
         Returns:
             Callable: A smart contract's function.
         """
-        self.logger.info("Get smart contract's function")
-        self.logger.debug(f"func_name={bridge_task_dto.func_name}")
+        self.logger.debug(f"Get smart contract's func_name={bridge_task_dto.func_name}")
 
         func =  self.w3_contract.get_function_by_name(bridge_task_dto.func_name)
         self.logger.debug(f"result: func={func}")
@@ -453,7 +443,7 @@ class RelayerBlockchainProvider(RelayerLogging, IRelayerBlockchain):
         Returns:
             Dict[str, Any]: The built transaction
         """
-        self.logger.info("Build transaction")
+        self.logger.debug("Build transaction")
         self.logger.debug(f"func_name={bridge_task_dto.func_name}")
         self.logger.debug(f"params={bridge_task_dto.params}")
         self.logger.debug(f"address={account.address}")
@@ -467,7 +457,6 @@ class RelayerBlockchainProvider(RelayerLogging, IRelayerBlockchain):
             self.logger.debug(f"result: built_tx={built_tx}")
             return built_tx
         except Exception as e:
-            print(e)
             self.logger.error(f"Fail building transaction! Error={e}")
             raise
 
@@ -486,7 +475,7 @@ class RelayerBlockchainProvider(RelayerLogging, IRelayerBlockchain):
         Returns:
             SignedTransaction: The signed transaction
         """
-        self.logger.info("Sign transaction")
+        self.logger.debug("Sign transaction")
         self.logger.debug(f"built_tx={built_tx}")
 
         try:
@@ -511,7 +500,7 @@ class RelayerBlockchainProvider(RelayerLogging, IRelayerBlockchain):
         Returns:
             HexBytes: The transaction hash
         """
-        self.logger.info("Send the raw transaction signed_tx")
+        self.logger.debug("Send the raw transaction signed_tx")
         self.logger.debug(f"signed_tx={signed_tx}")
 
         tx_hash = await self.w3.eth.send_raw_transaction(
@@ -532,7 +521,7 @@ class RelayerBlockchainProvider(RelayerLogging, IRelayerBlockchain):
         Returns:
             TxReceipt: The transaction receipt
         """
-        self.logger.info("Wait for transaction receipt for tx_hash")
+        self.logger.debug("Wait for transaction receipt for tx_hash")
         self.logger.debug(f"tx_hash={tx_hash.hex()}")
         
         tx_receipt = await self.w3.eth.wait_for_transaction_receipt(tx_hash)

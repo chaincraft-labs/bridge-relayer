@@ -8,6 +8,7 @@ from src.relayer.domain.exception import (
 )
 from src.relayer.domain.relayer import (
     BlockFinalityResult,
+    BridgeTaskDTO,
     CalculateBlockFinalityResult,
     DefineChainBlockFinalityResult,
     EventDTO,
@@ -19,7 +20,7 @@ from src.relayer.provider.mock_relayer_register_pika import (
     MockRelayerRegisterEvent,
 )
 from tests.conftest import DATA_TEST
-from utils.converter import to_bytes
+from src.utils.converter import to_bytes
 
 
 PATH = 'src.relayer.application.consume_event_task'
@@ -52,6 +53,14 @@ def event_dto():
     return EventDTO(
         name=event.event, # type: ignore
         data=event.args , # type: ignore
+    )
+
+@pytest.fixture(scope="function")
+def bridge_task_dto():
+    event = DATA_TEST.EVENT_SAMPLE.copy()
+    return BridgeTaskDTO(
+        func_name='func_name', 
+        params=event.args['params']
     )
 
 @pytest.fixture(scope="function")
@@ -429,21 +438,37 @@ def test_manage_validate_block_finality_success(
 ])
 def test_execute_smart_contract_function(
     consume_event_task, 
-    func_name
+    func_name,
+    bridge_task_dto
 ):
     """
         Test execute_smart_contract_function that calls 
         ExecuteContractTask.__call__ successfully 
     """
     app = consume_event_task
+    bridge_task_dto.func_name = func_name
     PATH_EXEC_CONTRACT = 'src.relayer.application.execute_contract'
     with patch(f'{PATH_EXEC_CONTRACT}.ExecuteContractTask.__call__') as mock:
-        app.execute_smart_contract_function(
-            chain_id=80002,
-            func_name=func_name,
-            params={}
+        app.execute_smart_contract_function = MagicMock(
+            side_effect=app.execute_smart_contract_function
         )
-        mock.assert_called()
+
+        app.execute_smart_contract_function(
+            chain_id=bridge_task_dto.params['chainIdTo'],
+            func_name=func_name,
+            params=bridge_task_dto.params
+        )
+        
+        app.execute_smart_contract_function.assert_called_with(
+            chain_id=bridge_task_dto.params['chainIdTo'],
+            func_name=func_name,
+            params=bridge_task_dto.params
+        )
+
+        mock.assert_called_with(
+            chain_id=bridge_task_dto.params['chainIdTo'],
+            bridge_task_dto=bridge_task_dto
+        )
 
 def test_callback_returns_none_with_invalid_event(consume_event_task):
     """Test _callback is returning None with a bad event."""

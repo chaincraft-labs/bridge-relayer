@@ -60,7 +60,8 @@ class ExecuteContractTask(BaseApp):
         """
         self.print_log("sendTx", (
             f"Sending transaction to chain_id={chain_id} "
-            f"func_name={bridge_task_dto.func_name}"
+            f"func_name={bridge_task_dto.func_name} "
+            f"params={bridge_task_dto.params}"
         ))
 
         result: BridgeTaskResult = asyncio.run(
@@ -69,11 +70,15 @@ class ExecuteContractTask(BaseApp):
         
         if result.ok:
             self.print_log("success", (
-                f"Transaction success func_name={bridge_task_dto.func_name} "
+                f"Transaction success chain_id={chain_id} "
+                f"func_name={bridge_task_dto.func_name} "
+                f"params={bridge_task_dto.params} "
                 f"Transaction_hash={result.ok.tx_hash}"
             ))
         else:
             self.print_log("fail", (
-                f"Transaction failed func_name={bridge_task_dto.func_name}' "
+                f"Transaction failed chain_id={chain_id} "
+                f"func_name={bridge_task_dto.func_name}' "
+                f"params={bridge_task_dto.params} "
                 f"error={result.err}"
             ))

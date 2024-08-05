@@ -59,7 +59,7 @@ class RelayerRegisterEvent(RelayerLogging, IRelayerRegister):
         Raises:
             BridgeRelayerRegisterEventFailed
         """
-        self.logger.info("Register message to RabbitMQ")
+        self.logger.debug("Register message to RabbitMQ")
         self.logger.debug(f'event=${event}')
 
         try:
@@ -82,7 +82,7 @@ class RelayerRegisterEvent(RelayerLogging, IRelayerRegister):
         Raises:
             BridgeRelayerReadEventFailed
         """
-        self.logger.info("Read messages from RabbitMQ")
+        self.logger.debug("Read messages from RabbitMQ")
         self.logger.debug(f'callback=${callback}')
 
         try:
@@ -124,7 +124,7 @@ class RelayerRegisterEvent(RelayerLogging, IRelayerRegister):
         Returns:
             ConnectionParameters: The connection parameters instance
         """
-        self.logger.info('Set parameters connection to RabbitMQ')
+        self.logger.debug('Set parameters connection to RabbitMQ')
 
         try:
             connection_parameters = ConnectionParameters(
@@ -157,7 +157,7 @@ class RelayerRegisterEvent(RelayerLogging, IRelayerRegister):
         Returns:
             BlockingConnection: The blocking connection instance
         """
-        self.logger.info('Connect to RabbitMQ')
+        self.logger.debug('Connect to RabbitMQ')
 
         try:
             blocking_connection = BlockingConnection(params)
@@ -180,7 +180,7 @@ class RelayerRegisterEvent(RelayerLogging, IRelayerRegister):
         Returns:
             BlockingChannel: the blockcing channel instance.
         """
-        self.logger.info('Create channel to RabbitMQ')
+        self.logger.debug('Create channel to RabbitMQ')
 
         try:
             blocking_connection = connection.channel()
@@ -208,7 +208,7 @@ class RelayerRegisterEvent(RelayerLogging, IRelayerRegister):
         Returns:
             BlockingChannel: The blockcing channel instance
         """
-        self.logger.info('Declare durable queue to RabbitMQ')
+        self.logger.debug('Declare durable queue to RabbitMQ')
 
         try:
             channel.queue_declare(queue=queue_name, durable=True)
@@ -229,7 +229,7 @@ class RelayerRegisterEvent(RelayerLogging, IRelayerRegister):
         Returns:
             BlockingConnection: A blocking connection instance
         """
-        self.logger.info('Connect to RabbitMQ')
+        self.logger.debug('Connect to RabbitMQ')
 
         credentials: PlainCredentials = self._get_credentials()
         self.logger.debug(f'credentials=${credentials}')
@@ -260,7 +260,7 @@ class RelayerRegisterEvent(RelayerLogging, IRelayerRegister):
             message (Union[str, bytes]): The message
             exchange (str, optional): The exchange name. Defaults to "".
         """
-        self.logger.info('Send message to RabbitMQ')
+        self.logger.debug('Send message to RabbitMQ')
 
         try:
             connection: BlockingConnection = self._connect()
@@ -304,7 +304,8 @@ class RelayerRegisterEvent(RelayerLogging, IRelayerRegister):
             properties (BasicProperties): A BasicProperties instance
             body (Any): The message body
         """
-        self.logger.info('Handle the message consume from RabbitMQ')
+        self.logger.debug('Handle the message consume from RabbitMQ')
+        self.logger.debug(f'body={body}')
         # Handle message body
         self.callback(body)
         channel.basic_ack(delivery_tag=method.delivery_tag)
@@ -323,7 +324,7 @@ class RelayerRegisterEvent(RelayerLogging, IRelayerRegister):
         Returns:
             BlockingChannel: _description_
         """
-        self.logger.info('Set channel qos to RabbitMQ')
+        self.logger.debug('Set channel qos to RabbitMQ')
         channel.basic_qos(prefetch_count=prefetch_count)
         return channel
 
@@ -342,7 +343,7 @@ class RelayerRegisterEvent(RelayerLogging, IRelayerRegister):
             auto_ack (bool, optional): Enable/disable auto acknowledge.
                 Defaults to False.
         """
-        self.logger.info('Receive message from RabbitMQ')
+        self.logger.debug('Receive message from RabbitMQ')
 
         try:
             connection: BlockingConnection = self._connect()
@@ -367,5 +368,5 @@ class RelayerRegisterEvent(RelayerLogging, IRelayerRegister):
         Args:
             queue_name (str): A queue name
         """
-        self.logger.info('Set queue name to RabbitMQ')
+        self.logger.debug('Set queue name to RabbitMQ')
         self.queue_name = queue_name

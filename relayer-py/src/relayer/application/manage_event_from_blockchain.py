@@ -93,6 +93,7 @@ class ManageEventFromBlockchain(BaseApp):
             RegisterEventResult: The event registered result
         """
         event_dto_to_byte: bytes = self._convert_data_to_bytes(event=event_dto)
+        self.print_log("receiveEvent", f"Received event: {event_dto}")
         app = RegisterEvent(
             relayer_register_provider=self.rr_provider,
             verbose=self.verbose
