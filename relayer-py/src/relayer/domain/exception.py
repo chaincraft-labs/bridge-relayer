@@ -46,6 +46,15 @@ class BridgeRelayerEventDataMissing(BridgeRelayerException):
 class BridgeRelayerBlockchainNotConnected(BridgeRelayerException):
     """Raise when not connected to bloclchain client."""
 
+
+class BridgeRelayerListenEventFailed(BridgeRelayerException):
+    """Raise when event listener failed."""
+
+
+class BridgeRelayerEventsFilterTypeError(BridgeRelayerException):
+    """Raise when events filter is invalid type."""
+
+
 # Register events
 
 class BridgeRelayerRegisterEventFailed(BridgeRelayerException):
@@ -69,4 +78,14 @@ class BridgeRelayerRegisterChannelError(BridgeRelayerException):
     
     
 class BridgeRelayerRegisterDeclareQueueError(BridgeRelayerException):
-    """Raise when declaring a queue failed."""    
+    """Raise when declaring a queue failed."""
+
+
+# Event Converter 
+class EventConverterTypeError(BridgeRelayerException):
+    """Raise when trying to create an EventDTO from event."""
+
+
+# Event Consumer
+class BlockFinalityTimeExceededError(BridgeRelayerException):
+    """Raise when The function has exceeded the allocated time for processing."""

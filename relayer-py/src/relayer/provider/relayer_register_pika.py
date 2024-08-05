@@ -4,14 +4,13 @@ Provider that aims to manage and register events.
 Events are sent to RabbitMQ, a messaging and streaming broker.
 https://www.rabbitmq.com/
 """
-import logging
 from typing import Any, Callable, Union
 
 from pika import (
     BasicProperties,
-    BlockingConnection, 
+    BlockingConnection,
     ConnectionParameters,
-    DeliveryMode, 
+    DeliveryMode,
     PlainCredentials,
 )
 from pika.spec import Basic
@@ -19,7 +18,7 @@ from pika.adapters.blocking_connection import BlockingChannel
 from pika.exceptions import AMQPConnectionError
 
 from src.relayer.interface.relayer import IRelayerRegister
-from src.relayer.config import get_register_config
+from src.relayer.config.config import get_register_config
 from src.relayer.domain.exception import (
     BridgeRelayerRegisterChannelError,
     BridgeRelayerRegisterConnectionError,
@@ -28,114 +27,77 @@ from src.relayer.domain.exception import (
     BridgeRelayerRegisterEventFailed,
     BridgeRelayerReadEventFailed,
 )
+from src.relayer.application.base_logging import RelayerLogging
 
 
-LOG_FORMAT = ('%(levelname) -10s %(asctime)s %(name) -30s %(funcName) '
-              '-35s %(lineno) -5d: %(message)s')
-LOGGER: logging.Logger = logging.getLogger(__name__)
-
-
-class RelayerRegisterEvent(IRelayerRegister):
+class RelayerRegisterEvent(RelayerLogging, IRelayerRegister):
     """Relayer register provider
-    
-    RabbitMQ is used as messaging and streaming broker. 
+
+    RabbitMQ is used as messaging and streaming broker.
     """
 
-    def __init__(self, debug: bool = False) -> None:
+    def __init__(self) -> None:
         """Init RelayerRegisterEvent.
 
         Args:
             debug (bool, optional): Enable/disable logging. Defaults to False.
         """
-        self._debug = debug
+        super().__init__()
         self.relayer_register_config = get_register_config()
         self.queue_name: str = self.relayer_register_config.queue_name
         self.callback: Callable
-        
-        # Set Logging
-        self._set_logging(debug)
-            
-    @property
-    def debug(self) -> bool:
-        """Get the debug value.
 
-        Returns:
-            bool: The debug value
-        """
-        return self._debug
-    
-    @debug.setter
-    def debug(self, value: bool) -> None:
-        """Set the debug value and enable disable the logging.
-
-        Args:
-            value (bool): The debug value
-        """
-        print(f"debug : {value}")
-        self._set_logging(value)
-    
     # ------------------------------------------------------------------
     # Implemented functions
     # ------------------------------------------------------------------
     def register_event(self, event: bytes) -> None:
         """Register the event.
-            
+
         Args:
             event (bytes): An event
 
         Raises:
             BridgeRelayerRegisterEventFailed
         """
-        LOGGER.info(f"Registering message to RabbitMQ with event: {event}")
-        
+        self.logger.info("Register message to RabbitMQ")
+        self.logger.debug(f'event=${event}')
+
         try:
-            routing_key: str = self.queue_name
-            message: bytes = event
-            
             self._send_message(
-                routing_key=routing_key, 
-                message=message
+                routing_key=self.queue_name,
+                message=event
             )
         except Exception as e:
-            LOGGER.critical(
-                f"Failed Registering message to RabbitMQ! "
-                f"event: {event}, error: {e}")
-            BridgeRelayerRegisterEventFailed(e)
-    
+            self.logger.error(
+                f"Failed registering message to RabbitMQ! "
+                f"event={event}, error={e}")
+            raise BridgeRelayerRegisterEventFailed(e)
+
     def read_events(self, callback: Callable) -> None:
         """Consume event tasks.
 
         Args:
             callback (Callable): A callback function
-            
+
         Raises:
             BridgeRelayerReadEventFailed
         """
-        LOGGER.info("Reading messages from RabbitMQ ...")
-                
+        self.logger.info("Read messages from RabbitMQ")
+        self.logger.debug(f'callback=${callback}')
+
         try:
-            routing_key: str = self.queue_name
-            self._consume_message(routing_key=routing_key, callback=callback)
-        
+            self._consume_message(
+                routing_key=self.queue_name, 
+                callback=callback
+            )
+
         except Exception as e:
-            LOGGER.critical(f"Failed Reading message from RabbitMQ! {e}")
-            BridgeRelayerReadEventFailed(e)
+            self.logger.error(f"Failed Reading message from RabbitMQ! {e}")
+            raise BridgeRelayerReadEventFailed(e)
 
     # ------------------------------------------------------------------
     # Internal functions
     # ------------------------------------------------------------------
-    def _set_logging(self, value: bool) -> None:
-        """Enable or disable the logging.
-
-        Args:
-            value (bool): A value indicating the logging on/off
-        """
-        if value is True:
-            logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
-            LOGGER.propagate = True
-        else:
-            LOGGER.propagate = False
-    
     def _get_credentials(self) -> PlainCredentials:
         """Get the plain credentials.
 
@@ -143,12 +105,12 @@ class RelayerRegisterEvent(IRelayerRegister):
             PlainCredentials: The plain credentials instance
         """
         return PlainCredentials(
-            self.relayer_register_config.user, 
-            self.relayer_register_config.password, 
+            self.relayer_register_config.user,
+            self.relayer_register_config.password,
         )
-    
+
     def _get_connection_parameters(
-        self, 
+        self,
         credentials: PlainCredentials
     ) -> ConnectionParameters:
         """Get the connection parameters.
@@ -162,23 +124,26 @@ class RelayerRegisterEvent(IRelayerRegister):
         Returns:
             ConnectionParameters: The connection parameters instance
         """
-        LOGGER.info('Setting parameters connection to RabbitMQ ...')
-        
+        self.logger.info('Set parameters connection to RabbitMQ')
+
         try:
-            return ConnectionParameters(
+            connection_parameters = ConnectionParameters(
                 host=self.relayer_register_config.host,
                 port=self.relayer_register_config.port,
                 virtual_host="/",
                 credentials=credentials,
             )
+            self.logger.debug(f'connection_parameters=${connection_parameters}')
+            return connection_parameters
+        
         except TypeError as e:
-            LOGGER.critical(
-                f"Error setting parameters connection to RabbitMQ! error : {e}"
+            self.logger.error(
+                f"Error setting parameters connection to RabbitMQ! Error={e}"
             )
             raise BridgeRelayerRegisterCredentialError(e)
-        
+
     def _get_connection(
-        self, 
+        self,
         params: ConnectionParameters
     ) -> BlockingConnection:
         """Get the blocking connection instance.
@@ -192,14 +157,15 @@ class RelayerRegisterEvent(IRelayerRegister):
         Returns:
             BlockingConnection: The blocking connection instance
         """
-        LOGGER.info('Connecting to RabbitMQ ...')
-        
-        try:
-            return BlockingConnection(params)
+        self.logger.info('Connect to RabbitMQ')
 
-        
+        try:
+            blocking_connection = BlockingConnection(params)
+            self.logger.debug(f'blocking_connection=${blocking_connection}')
+            return blocking_connection
+
         except ValueError as e:
-            LOGGER.critical(f"Error connectiing to RabbitMQ! error : {e}")
+            self.logger.error(f"Error connecting to RabbitMQ! Error={e}")
             raise BridgeRelayerRegisterConnectionError(e)
 
     def _get_channel(self, connection: BlockingConnection) -> BlockingChannel:
@@ -214,17 +180,19 @@ class RelayerRegisterEvent(IRelayerRegister):
         Returns:
             BlockingChannel: the blockcing channel instance.
         """
-        LOGGER.info('Creating channel to RabbitMQ ...')
-        
+        self.logger.info('Create channel to RabbitMQ')
+
         try:
-            return connection.channel()
-        
+            blocking_connection = connection.channel()
+            self.logger.debug(f'blocking_connection=${blocking_connection}')
+            return blocking_connection
+
         except AttributeError as e:
-            LOGGER.critical(f"Failed Creating channel to RabbitMQ! error : {e}")
+            self.logger.error(f"Failed Creating channel to RabbitMQ! Error={e}")
             raise BridgeRelayerRegisterChannelError(e)
 
     def _declare_queue(
-        self, 
+        self,
         channel: BlockingChannel,
         queue_name: str
     ) -> BlockingChannel:
@@ -240,15 +208,16 @@ class RelayerRegisterEvent(IRelayerRegister):
         Returns:
             BlockingChannel: The blockcing channel instance
         """
-        LOGGER.info('Declaring durable queue to RabbitMQ ...')
-        
+        self.logger.info('Declare durable queue to RabbitMQ')
+
         try:
             channel.queue_declare(queue=queue_name, durable=True)
+            self.logger.debug(f'channel=${channel}')
             return channel
-            
+
         except AttributeError as e:
-            LOGGER.critical(
-                f"Failed declaring durable queue to RabbitMQ! error {e}")
+            self.logger.error(
+                f"Failed declaring durable queue to RabbitMQ! Error={e}")
             raise BridgeRelayerRegisterDeclareQueueError(e)
 
     def _connect(self) -> BlockingConnection:
@@ -260,21 +229,26 @@ class RelayerRegisterEvent(IRelayerRegister):
         Returns:
             BlockingConnection: A blocking connection instance
         """
-        LOGGER.info('Connecting to RabbitMQ ...')
-        
+        self.logger.info('Connect to RabbitMQ')
+
         credentials: PlainCredentials = self._get_credentials()
+        self.logger.debug(f'credentials=${credentials}')
+        
         parameters: ConnectionParameters = self._get_connection_parameters(
             credentials)
-        
+        self.logger.debug(f'parameters=${parameters}')
+
         try:
-            return self._get_connection(parameters)
-            
+            blocking_connection = self._get_connection(parameters)
+            self.logger.debug(f'blocking_connection=${blocking_connection}')
+            return blocking_connection
+
         except AMQPConnectionError as e:
-            LOGGER.critical(f"Failed connecting to RabbitMQ! error : {e}")
+            self.logger.error(f"Failed connecting to RabbitMQ! Error={e}")
             raise BridgeRelayerRegisterConnectionError(e)
 
     def _send_message(
-        self, 
+        self,
         routing_key: str,
         message: Union[str, bytes],
         exchange: str = "",
@@ -286,37 +260,42 @@ class RelayerRegisterEvent(IRelayerRegister):
             message (Union[str, bytes]): The message
             exchange (str, optional): The exchange name. Defaults to "".
         """
-        LOGGER.info('Sending message to RabbitMQ ...')
+        self.logger.info('Send message to RabbitMQ')
 
         try:
             connection: BlockingConnection = self._connect()
+            self.logger.debug(f'connection=${connection}')
+            
             channel: BlockingChannel = self._get_channel(connection=connection)
+            self.logger.debug(f'channel=${channel}')
+            
             channel: BlockingChannel = self._declare_queue(
                 channel=channel, queue_name=routing_key)
+            self.logger.debug(f'channel=${channel}')
 
             channel.basic_publish(
                 exchange=exchange,
                 routing_key=routing_key,
                 body=message,
                 properties=BasicProperties(
-                    delivery_mode = DeliveryMode.Persistent
+                    delivery_mode=DeliveryMode.Persistent
                 )
             )
-            
+
             connection.close()
         except Exception as e:
-            LOGGER.critical('Error Sending message to RabbitMQ!')
+            self.logger.error(f'Error Sending message to RabbitMQ! Error={e}')
             raise
 
     def _callback(
-        self, 
-        channel: BlockingChannel, 
-        method: Basic.Deliver, 
-        properties: BasicProperties, 
+        self,
+        channel: BlockingChannel,
+        method: Basic.Deliver,
+        properties: BasicProperties,
         body: Any
     ) -> None:
         """Handle the message consume from RabbitMQ.
-        
+
         This method execute another callback set in the application layer.
 
         Args:
@@ -325,12 +304,13 @@ class RelayerRegisterEvent(IRelayerRegister):
             properties (BasicProperties): A BasicProperties instance
             body (Any): The message body
         """
+        self.logger.info('Handle the message consume from RabbitMQ')
         # Handle message body
         self.callback(body)
-        channel.basic_ack(delivery_tag = method.delivery_tag)
+        channel.basic_ack(delivery_tag=method.delivery_tag)
 
     def _set_channel_qos(
-        self, 
+        self,
         channel: BlockingChannel,
         prefetch_count: int = 1
     ) -> BlockingChannel:
@@ -343,12 +323,13 @@ class RelayerRegisterEvent(IRelayerRegister):
         Returns:
             BlockingChannel: _description_
         """
+        self.logger.info('Set channel qos to RabbitMQ')
         channel.basic_qos(prefetch_count=prefetch_count)
-        return  channel
+        return channel
 
 
     def _consume_message(
-        self, 
+        self,
         routing_key: str,
         callback: Callable,
         auto_ack: bool = False,
@@ -358,33 +339,33 @@ class RelayerRegisterEvent(IRelayerRegister):
         Args:
             routing_key (str): The routing key
             callback (Callable): A callback function
-            auto_ack (bool, optional): Enable/disable auto acknowledge. 
+            auto_ack (bool, optional): Enable/disable auto acknowledge.
                 Defaults to False.
         """
-        LOGGER.info('Receiving message from RabbitMQ ...')
-        
+        self.logger.info('Receive message from RabbitMQ')
+
         try:
             connection: BlockingConnection = self._connect()
             channel: BlockingChannel = self._get_channel(connection=connection)
             channel = self._set_channel_qos(channel=channel)
             self.callback = callback
-            
+
             channel.basic_consume(
                 queue=routing_key,
                 auto_ack=auto_ack,
                 on_message_callback=self._callback
-            )            
+            )
             channel.start_consuming()
-            
+
         except Exception as e:
-            LOGGER.critical('Error Receiving message from RabbitMQ!')
+            self.logger.error(f'Error Receiving message from RabbitMQ! Error={e}')
             raise
-   
+
     def _set_queue_name(self, queue_name: str) -> None:
         """Set a queue name to register messages.
 
         Args:
             queue_name (str): A queue name
         """
+        self.logger.info('Set queue name to RabbitMQ')
         self.queue_name = queue_name
- 

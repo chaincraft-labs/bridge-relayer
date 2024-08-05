@@ -1,9 +1,10 @@
 """Converter tool."""
 from io import BytesIO
-from typing import Any, Dict
+from typing import Any
 import pickle
 
-from web3.datastructures import AttributeDict
+from src.relayer.domain.relayer import EventDTO
+
 
 def _serialize_data(data: Any) -> BytesIO:
     """Serialize data to a BytesIO object.
@@ -14,13 +15,14 @@ def _serialize_data(data: Any) -> BytesIO:
     Returns:
         BytesIO: The data serialized
     """
-    if isinstance(data, AttributeDict):
-        data = dict(data)
+    if isinstance(data, EventDTO):
+        data = data.as_dict()
     
     pickle_data = pickle.dumps(
         data, protocol=pickle.HIGHEST_PROTOCOL)
 
     return BytesIO(pickle_data)
+
 
 def to_bytes(data: Any) -> bytes:
     """Convert data to a bytes object.

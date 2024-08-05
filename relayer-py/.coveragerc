@@ -2,5 +2,19 @@
 source =
     src/
    
+omit =
+    tests/*
+    */__init__.py
+    */migrations/*
+    */interface/*
+    */mock_*
+
 [report]
 show_missing = True
+
+omit =
+    tests/*
+    */__init__.py
+    */migrations/*
+    */interface/*
+    */mock_*

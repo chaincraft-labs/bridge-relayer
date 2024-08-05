@@ -1,14 +1,12 @@
 """Interface for Bridge Relayer."""
 from abc import ABC, abstractmethod
-from typing import Any, Callable
+from typing import Any, Callable, List
 
 from src.relayer.domain.relayer import (
     BridgeTaskResult,
 )
 from src.relayer.domain.relayer import (
-    EventDTO,
     BridgeTaskDTO,
-    RegisterEventResult,
 )
 
 
@@ -30,6 +28,14 @@ class IRelayerBlockchain(ABC):
         Args:
             chain_id (int): The chain id
         """
+        
+    @abstractmethod
+    def set_event_filter(self, events: List[str]):
+        """Set the event filter.
+
+        Args:
+            events (List[str]): The events list to filter.
+        """        
    
     @abstractmethod
     def listen_events(self, callback: Callable, poll_interval: int) -> Any:
@@ -72,16 +78,3 @@ class IRelayerRegister(ABC):
         Args:
             callback (Callable): A callback function
         """
-
-
-
-# class IRelayerTask(ABC):
-#     """Interface for Relay task application."""
-        
-#     @abstractmethod
-#     def read_bridge_task(self) -> BridgeTaskDTO:
-#         """Read bridge task.
-
-#         Returns:
-#             BridgeTaskDTO: A BridgeTaskDTO
-#         """

@@ -12,22 +12,24 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
-from src.relayer.domain.relayer import EventDTO
-from src.relayer.provider.relayer_register_pika import (
-    RelayerRegisterEvent as _p_register,
-)
-from src.relayer.application.relayer_blockchain import (
+from src.relayer.domain.relayer import EventDTO  # noqa: E402
+from src.relayer.application.manage_event_from_blockchain import (  # noqa: E402
     ManageEventFromBlockchain,
+)
+from src.relayer.application.consume_event_task import (  # noqa: E402
     ConsumeEventTask,
 )
-from src.relayer.provider.relayer_blockchain_web3 import (
+from src.relayer.provider.relayer_register_pika import (  # noqa: E402
+    RelayerRegisterEvent as _p_register,
+)
+from src.relayer.provider.relayer_blockchain_web3 import (  # noqa: E402
     RelayerBlockchainProvider as _p_blockchain,
 )
 
 def consume(debug: bool = False) -> None:
     """Consume events tasks from queue."""
-    blockchain_provider = _p_blockchain(debug=debug)
-    consumer_provider = _p_register(debug=debug)
+    blockchain_provider = _p_blockchain()
+    consumer_provider = _p_register()
     app = ConsumeEventTask(
         relayer_blockchain_provider=blockchain_provider,
         relayer_consumer_provider=consumer_provider,

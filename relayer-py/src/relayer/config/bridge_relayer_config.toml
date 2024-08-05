@@ -2,39 +2,48 @@
 mode = "prod"
 
 [relayer_blockchain]
-    
-    # [relayer_blockchain.ChainId441]
-    # rpc_url = "https://harmonie-endpoint-02.allfeat.io/"
-    # project_id = "{{ PROJECT_ID_441 }}"
-    # pk = "{{ PK_441 }}"
-    # wait_block_validation = 3
-    # smart_contract_address = "0xe13ab9d8Ee50969341d6E2D7bD945e4d6f6D0a1E"
-    # genesis_block = 1009723
-    # client = ""
+
+    [relayer_blockchain.ChainId80002]
+    rpc_url = "https://polygon-amoy.g.alchemy.com/v2/"
+    project_id = "{{ PROJECT_ID_80002 }}"
+    pk = "{{ PK_80002 }}"
+    wait_block_validation = 6
+    smart_contract_address = "0x6dC7CfE7Ce3c4d071fABC7B616E94fBba361B212"
+    genesis_block = 8267279
+    client = "middleware"
 
     [relayer_blockchain.ChainId441]
     rpc_url = "https://harmonie-endpoint-02.allfeat.io/"
     project_id = "{{ PROJECT_ID_441 }}"
     pk = "{{ PK_441 }}"
     wait_block_validation = 2
-    smart_contract_address = "0x9609CeF4e2B2BeC75EC1FE347a5ACaF5CAE979EE"
-    genesis_block = 1009723
+    smart_contract_address = "0xE86603d2b796412432237c4C0837F68175f13D08"
+    genesis_block = 1091325
     client = ""
-    
+
     [relayer_blockchain.ChainId11155111]
     rpc_url = "https://eth-sepolia.g.alchemy.com/v2/"
     project_id = "{{ PROJECT_ID_11155111 }}"
     pk = "{{ PK_11155111 }}"
     wait_block_validation = 2
-    smart_contract_address = "0xda0a222eA8342F501080BE030Bc4b990FcC85623"
-    genesis_block = 6106406
+    smart_contract_address = "0xfC7D37432d637e334b391F5ecf283d69783dBe64"
+    genesis_block = 6186178
     client = "middleware"
 
 
+  [relayer_blockchain.ChainId1]
+    rpc_url = "https://eth-mainnet.g.alchemy.com/v2/"
+    project_id = "{{ PROJECT_ID_1 }}"
+    pk = "{{ PK_1 }}"
+    wait_block_validation = 2
+    smart_contract_address = "0xE86603d2b796412432237c4C0837F68175f13D08"
+    genesis_block = 1091325
+    client = ""
+
 [relayer_register]
-# RabbitMQ Broker 
-host = "localhost"
-port = 5672
-user = "guest"
+# RabbitMQ Broker
+host = "{{ RELAYER_REGISTER_HOST }}"
+port = "{{ RELAYER_REGISTER_PORT }}"
+user = "{{ RELAYER_REGISTER_USER }}"
 password = "{{ RELAYER_REGISTER_PASSWORD }}"
-queue_name = "bridge.relayer.prod"
+queue_name = "{{ RELAYER_REGISTER_QUEUE_NAME }}"
