@@ -54,6 +54,7 @@ class ManageEventFromBlockchain(BaseApp):
 
     def __call__(self) -> None:
         """Listen event main function."""
+
         try:
             self.listen_events()
         except KeyboardInterrupt:

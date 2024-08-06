@@ -137,9 +137,9 @@ def test_store_operation_hash( consume_event_task, event_dto):
     assert app.operation_hash_events[op_hash] == expected
 
 @pytest.mark.parametrize('chain_ids, expected', [
-    ([80002, 440], 80002),
-    ([440, 1337], 440),
-    ([440, 80002], 80002),
+    ([123, 456], 123),
+    ([456, 123], 123),
+    ([456, 789], 456),
 ])
 def test_define_chain_for_block_finality_chain_a_success(
     consume_event_task, 
@@ -156,9 +156,9 @@ def test_define_chain_for_block_finality_chain_a_success(
     """
     print()
     app = consume_event_task
-    # chain id 80002  wait_block_validation = 6
-    # chain id 440    wait_block_validation = 1
-    # chain id 1337   wait_block_validation = 1
+    # chain id 123  wait_block_validation = 6
+    # chain id 456    wait_block_validation = 1
+    # chain id 789   wait_block_validation = 1
     event_dto.data['params']['chainIdFrom'] = chain_ids[0]
     event_dto.data['params']['chainIdTo'] = chain_ids[1]
     result = app.define_chain_for_block_finality(event_dto=event_dto)

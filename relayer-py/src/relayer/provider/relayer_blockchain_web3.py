@@ -131,6 +131,7 @@ class RelayerBlockchainProvider(RelayerLogging, IRelayerBlockchain):
             raise BridgeRelayerListenEventFailed(e)
 
         finally:
+            self.logger.debug("close loop")
             loop.close()
 
     async def call_contract_func(
@@ -242,10 +243,12 @@ class RelayerBlockchainProvider(RelayerLogging, IRelayerBlockchain):
         Returns:
             AsyncWeb3: A provider instance
         """
-        w3 = AsyncWeb3(AsyncHTTPProvider(
-            f"{self.relay_blockchain_config.rpc_url}"\
+        rpc_url = (
+            f"{self.relay_blockchain_config.rpc_url}"
             f"{self.relay_blockchain_config.project_id}"
-        ))
+        )
+        self.logger.debug(f'rpc_url={rpc_url}')
+        w3 = AsyncWeb3(AsyncHTTPProvider(rpc_url))
 
         if self.relay_blockchain_config.client == "middleware":
             w3.middleware_onion.inject(async_geth_poa_middleware, layer=0)

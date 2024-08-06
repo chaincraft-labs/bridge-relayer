@@ -85,6 +85,7 @@ if __name__ == "__main__":
 
         if args.chain_id:
             app(chain_id=int(args.chain_id), debug=args.debug)
+
         else:
             print("[ 💔 ] chain_id is missing!\n")
             parser.parser.print_help()

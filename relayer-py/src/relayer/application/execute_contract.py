@@ -78,7 +78,7 @@ class ExecuteContractTask(BaseApp):
         else:
             self.print_log("fail", (
                 f"Transaction failed chain_id={chain_id} "
-                f"func_name={bridge_task_dto.func_name}' "
+                f"func_name={bridge_task_dto.func_name} "
                 f"params={bridge_task_dto.params} "
                 f"error={result.err}"
             ))

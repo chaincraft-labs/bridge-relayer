@@ -80,7 +80,9 @@ def test_call_contract_func_print_err_with_failed_tx(
     )
 
     app.print_log.assert_called_with("fail", (
-        f"Transaction failed func_name={bridge_task_dto.func_name}' "
+        f"Transaction failed chain_id=80002 "
+        f"func_name={bridge_task_dto.func_name} "
+        f"params={bridge_task_dto.params} "
         f"error=fake Tx exception"
     ))
 
@@ -103,7 +105,9 @@ def test_call_contract_func_print_success_with_valid_tx(
     )
 
     app.print_log.assert_called_with("success", (
-        f"Transaction success func_name={bridge_task_dto.func_name} "
+        f"Transaction success chain_id=80002 "
+        f"func_name={bridge_task_dto.func_name} "
+        f"params={bridge_task_dto.params} "
         f"Transaction_hash={blockchain_provider.tx_hash}"
     ))
 

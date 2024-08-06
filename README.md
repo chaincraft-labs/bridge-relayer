@@ -9,8 +9,7 @@ A centralized blockchain bridge relayer that aims to connect two blockchains (Pr
 #### Clone the directory
 
 ```bash
-git clone https://github.com/AlyraButerin/bridge-relay-poc
-cd bridge-relay-poc
+git clone https://github.com/AlyraButerin/bridge-relay-poc && cd bridge-relay-poc
 ```
 
 #### Install dependencies
@@ -52,7 +51,7 @@ There are 4 files at the location: src/config
 - bridge_relayer_config.toml
 
 1. edit **bridge_relayer_config_dev.toml** and **bridge_relayer_config.toml**
-   1. set RelayerBridge smart contract's address
+   1. set `RelayerBridge` smart contract's address
 2. edit **abi.json** and **abi_dev.json**
    1. add the abi for each chain_id
 
@@ -85,10 +84,10 @@ Through the RabbitMQ web GUI, go to:
    2. bridge.relayer.prod
 4. Add queue
 
-> ❗Queue name are set in
+> ❗Queue names are set in
 >
-> `config/bridge_relayer_config_dev.toml`
-> `config/bridge_relayer_config.toml`
+> `env.config.dev`
+> `env.config.prod`
 
 
 ### Run the bridge relayer
@@ -96,28 +95,38 @@ Through the RabbitMQ web GUI, go to:
 You need to run 2 event listeners and 1 event task listener.
 
 *Example:*
-2 event listeners, one for each blockchain
+
+A event listener per blockchain (chain id)
 
 - chain id 441 (Allfeat)
+- chain id 440 (Allfeat local node)
 - chain id 11155111 (Sepolia)
+- chain id 1337 (Geth local node)
+- chain id 80002 (Polygon)
 
-> Note: Add --debug to enable the debug
-
-#### Run the event listener on 441
+#### Run an event listener for Allfeat
 
 In a new terminal execute:
 
 ```bash
 cd relayer-py
+# Allfeat dev
 poetry run python bin/event_listener.py --chain_id 441
+# Allfeat local node
+poetry run python bin/event_listener.py --chain_id 440
 ```
 
-#### Run the event listener on 11155111
+#### Run an event listener for Ethereum or other blockchain
 
 In a new terminal execute:
 
 ```bash
+# Sepolia
 poetry run python bin/event_listener.py --chain_id 11155111
+# Geth local node
+poetry run python bin/event_listener.py --chain_id 1337
+# Polygon
+poetry run python bin/event_listener.py --chain_id 80002
 ```
 
 #### Run the event task listener
@@ -137,8 +146,7 @@ poetry run python bin/task_listener.py --watch
 # Start a geth node
 geth geth --datadir . --dev --http --dev.period 12
 
-
-
+# Deploy 
 geth HARDHAT_NETWORK=allfeat_local node scripts/as_bridge.js --deploy gethAllfeatLocal
 
 geth HARDHAT_NETWORK=geth node scripts/as_bridge.js --deposit-fees gethAllfeatLocal

@@ -222,7 +222,7 @@ def test_set_event_filter_raise_exception(provider):
     """
     with pytest.raises(BridgeRelayerEventsFilterTypeError) as e:
         provider.set_event_filter(events='AnEventInSmartContract')
-    assert str(e.value.args[0]) == "'events' not a list!"
+    assert str(e.value.args[0]) == "events 'AnEventInSmartContract' is not a list!"
 
 def test_set_event_filter_with_success(provider):
     """

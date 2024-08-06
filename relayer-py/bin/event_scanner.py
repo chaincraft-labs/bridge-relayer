@@ -40,8 +40,8 @@ current_dir: str = os.path.dirname(os.path.abspath(__file__))
 parent_dir: str = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
-from src.relayer.config import get_blockchain_config, get_abi
-from src.utils.converter import to_bytes
+from src.relayer.config.config import get_blockchain_config, get_abi
+
 
 logger = logging.getLogger(__name__)
 
@@ -798,11 +798,14 @@ if __name__ == "__main__":
         config = get_blockchain_config(chain_id)
         abi = get_abi(chain_id)
 
+
+        # print(config.__dict__)
         # Enable logs to the stdout.
         # DEBUG is very verbose level
         logging.basicConfig(level=logging.INFO)
 
         rpc_url = f"{config.rpc_url}{config.project_id}"
+        print(f"rpc_url={rpc_url}")
         provider = HTTPProvider(rpc_url)
 
         # Remove the default JSON-RPC retry middleware
@@ -813,6 +816,7 @@ if __name__ == "__main__":
         provider.middlewares.clear() # type: ignore
 
         w3: Web3 = Web3(provider)
+        print(w3.client_version)
         
         # if config.client == "middleware":
         #     w3.middleware_onion.inject(geth_poa_middleware, layer=0)
@@ -872,8 +876,15 @@ if __name__ == "__main__":
             state.get_last_scanned_block() - chain_reorg_safety_blocks,
             config.genesis_block,
         )
-        print(f"{"start_block":<{title_length}} : {start_block}")
+
+        # print(f"state.get_last_scanned_block()={state.get_last_scanned_block()}")
+        # print(f"chain_reorg_safety_blocks={chain_reorg_safety_blocks}")
+        # print(f"config.genesis_block={config.genesis_block}")
         
+
+        print(f"{"start_block":<{title_length}} : {start_block}")
+        # sys.exit()
+
         end_block = scanner.get_suggested_scan_end_block()
         print(f"{"end_block":<{title_length}} : {end_block}")
         
