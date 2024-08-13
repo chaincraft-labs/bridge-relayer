@@ -8,22 +8,23 @@ class BaseApp:
 
     class Emoji(Enum):
         """"""
-        main = "💠"
-        receive = "📩"
-        success = "🟢"
-        info = "🔵"
-        alert = "🟠"
-        fail = "🔴"
-        wait = "⏳"
-        emark = "❕"
-        sendTx = "🟣"
-        receiveEvent = "🔵"
-        blockFinality = "🟡"
+        none = ""
+        main = "💠 "
+        receive = "📩 "
+        success = "🟢 "
+        info = "🔵 "
+        alert = "🟠 "
+        fail = "🔴 "
+        wait = "⏳ "
+        emark = "❕ "
+        sendTx = "🟣 "
+        receiveEvent = "🔵 "
+        blockFinality = "🟡 "
 
 
     def print_log(self, status, message):
         """Print a log."""
 
         if self.verbose:
-            print(f"{self.Emoji[status].value} {message}")
+            print(f"{self.Emoji[status].value}{message}")
 

@@ -20,7 +20,7 @@ from web3 import Web3
 from web3.contract.base_contract import BaseContractEvent
 from web3.contract.contract import Contract
 from web3.datastructures import AttributeDict
-from web3.exceptions import BlockNotFound
+from web3.exceptions import BlockNotFound, ABIEventFunctionNotFound
 from web3.middleware.geth_poa import geth_poa_middleware
 from web3.providers.rpc import HTTPProvider
 from eth_abi.codec import ABICodec
@@ -71,13 +71,14 @@ class EventScannerState(ABC):
         """
 
     @abstractmethod
-    def end_chunk(self, block_number: int):
+    def end_chunk(self, block_number: int, end_block: int):
         """Scanner finished a number of blocks.
 
         Persistent any data in your state now.
 
         Args:
             block_number (int): _description_
+            end_block (int): _description_
         """
 
     @abstractmethod
@@ -177,7 +178,7 @@ class EventScanner:
         self.request_retry_seconds = request_retry_seconds
 
         # Factor how fast we increase the chunk size if results are found
-        # # (slow down scan after starting to get hits)
+        # (slow down scan after starting to get hits)
         self.chunk_size_decrease = 0.5
 
         # Factor how fast we increase chunk size if no results found
@@ -262,7 +263,8 @@ class EventScanner:
         Args:
             after_block (int): _description_
         """
-        self.state.delete_data(after_block)
+        if after_block > 0:
+            self.state.delete_data(after_block)
 
     def get_block_when(
         self, 
@@ -359,12 +361,10 @@ class EventScanner:
                 )
                 
                 if block_when is not None and evt is not None:
-                    processed = self.state.process_event(
-                        block_when, evt)
-                    
+                    processed = self.state.process_event(block_when, evt)
                     all_processed.append(processed)
 
-        end_block_timestamp = get_block_when(end_block)
+        end_block_timestamp: Optional[datetime.datetime] = get_block_when(end_block)
         return end_block, end_block_timestamp, all_processed
 
     def estimate_next_chunk_size(
@@ -449,12 +449,13 @@ class EventScanner:
         all_processed = []
 
         while current_block <= end_block:
-
+            # not used
             # self.state.start_chunk(current_block, chunk_size)
 
             # Print some diagnostics to logs to try to fiddle with real 
             # world JSON-RPC API performance
             estimated_end_block = current_block + chunk_size
+            # print(f"estimated_end_block={estimated_end_block}")
             logger.debug(
                 f"Scanning token transfers for blocks: "
                 f"{current_block} - {estimated_end_block}, chunk size "
@@ -463,6 +464,7 @@ class EventScanner:
             )
 
             start = time.time()
+            print(f"current_block={current_block} estimated_end_block={estimated_end_block}")
             (
                 actual_end_block, 
                 end_block_timestamp, 
@@ -493,9 +495,174 @@ class EventScanner:
             # Set where the next chunk starts
             current_block = current_end + 1
             total_chunks_scanned += 1
-            self.state.end_chunk(current_end)
+            
+            self.state.end_chunk(current_end, end_block)
 
         return all_processed, total_chunks_scanned
+
+
+class HexJsonEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, HexBytes) or isinstance(obj, bytes):
+            return obj.hex()
+        if isinstance(obj, AttributeDict):
+            return dict(obj)
+        return super().default(obj)
+
+
+class JSONifiedState(EventScannerState):
+    """Store the state of scanned blocks and all events.
+
+    All state is an in-memory dict.
+    Simple load/store massive JSON on start up.
+    """
+
+    def __init__(self, chain_id: int):
+        # self.state = None
+        self.chain_id = str(chain_id)
+        self.state = {}
+        self.fname = f"{chain_id}-events-scanner.json"
+        # How many second ago we saved the JSON file
+        self.last_save = 0
+
+    def set_chain_id(self):
+        """"""
+        if self.chain_id not in self.state:
+            self.state[self.chain_id] = {
+                "last_scanned_block": 0,
+                "blocks": {},
+            }
+
+    def reset(self):
+        """Create initial state of nothing scanned."""
+        self.state = {}
+        self.set_chain_id()
+    
+    def restore(self):
+        """Restore the last scan state from a file."""
+        try:
+            self.state = json.load(open(self.fname, "rt"))
+            self.set_chain_id()
+        
+        except (IOError, json.decoder.JSONDecodeError):
+            print("State starting from scratch")
+            self.reset()
+
+    def save(self):
+        """Save everything we have scanned so far in a file."""
+        with open(self.fname, "wt") as f:
+            json.dump(self.state, f, cls=HexJsonEncoder)
+
+        self.last_save = time.time()
+
+    #
+    # EventScannerState methods implemented below
+    #
+
+    def get_last_scanned_block(self):
+        """The number of the last block we have stored."""
+        return self.state[self.chain_id].get("last_scanned_block", 0)
+        # return self.state[self.chain_id]["last_scanned_block"]
+
+    def delete_data(self, since_block):
+        """Remove potentially reorganised blocks from the scan data."""
+        for block_num in range(since_block, self.get_last_scanned_block()):
+            if block_num in self.state[self.chain_id].get("blocks", {}):
+                del self.state[self.chain_id]["blocks"][block_num]
+
+    def start_chunk(self, block_number, chunk_size):
+        pass
+
+    def end_chunk(self, block_number: int, end_block: int):
+        """
+            Save at the end of each block, so we can resume 
+            in the case of a crash or CTRL+C
+            
+        """
+        # Next time the scanner is started we will resume from this block
+        if end_block > block_number:
+            self.state[self.chain_id]["last_scanned_block"] = block_number
+        else:
+            self.state[self.chain_id]["last_scanned_block"] = end_block
+
+        # Save the database file for every minute
+        if time.time() - self.last_save > 60:
+            self.save()
+
+    def process_event(
+        self, 
+        block_when: datetime.datetime, 
+        event: EventData
+    ) -> str:
+        """Record event in database.
+
+        Args:
+            block_when (datetime.datetime): _description_
+            event (EventData): _description_
+
+        Returns:
+            str: _description_
+        """
+        log_index = str(event.logIndex)
+        block_number = str(event.blockNumber)
+        txhash = event.transactionHash.hex()
+
+        dto = {
+            "event": event.event,
+            "data": event["args"],
+            "timestamp": block_when.isoformat(),
+        }
+
+        blocks = self.state[self.chain_id].get("blocks", {})
+
+        if block_number not in blocks:
+            blocks[block_number] = {}
+
+        block = blocks[block_number]
+        if txhash not in block:
+            blocks[block_number][txhash] = {}
+
+        blocks[block_number][txhash][log_index] = dto
+
+        # Return a pointer that allows us to look up this event later 
+        # if needed
+        return f"{block_number}-{txhash}-{log_index}"
+
+
+class RegisterEvents:
+
+    def __init__(self, chain_id: int):
+        self.chain_id = str(chain_id)
+        self.state = {}
+        self.fname = f"{chain_id}-events-register.json"
+        
+    def set_chain_id(self):
+        """"""
+        if self.chain_id not in self.state:
+            self.state[self.chain_id] = {
+                "blocks": {},
+            }
+
+    def reset(self):
+        """Create initial state of nothing scanned."""
+        self.state = {}
+        self.set_chain_id()
+    
+    def restore(self):
+        """Restore the last scan state from a file."""
+        try:
+            self.state = json.load(open(self.fname, "rt"))
+            self.set_chain_id()
+        
+        except (IOError, json.decoder.JSONDecodeError):
+            self.reset()
+
+    def save(self):
+        """Save everything we have scanned so far in a file."""
+        with open(self.fname, "wt") as f:
+            json.dump(self.state, f, cls=HexJsonEncoder)
+
+        self.last_save = time.time()
 
 
 def _retry_web3_call(
@@ -559,7 +726,7 @@ def _fetch_events_for_all_contracts(
     w3: Web3,
     event_type: type[BaseContractEvent],
     argument_filters: Dict[str, Any],
-    from_block: int,
+    from_block: Optional[int],
     to_block: int
 ) -> List[EventData]:
     """Get events using eth_getLogs API.
@@ -584,7 +751,9 @@ def _fetch_events_for_all_contracts(
         List[EventData]: _description_
     """
     if from_block is None:
-        raise TypeError("Missing mandatory keyword argument to get_logs: from_block")
+        raise TypeError(
+            "Missing mandatory keyword argument to get_logs: from_block"
+        )
 
     # Currently no way to poke this using a public web3.py API.
     # This will return raw underlying ABI JSON object for the event
@@ -656,137 +825,7 @@ if __name__ == "__main__":
     # # https://pypi.org/project/tqdm/
     # from tqdm import tqdm
 
-    class HexJsonEncoder(json.JSONEncoder):
-        def default(self, obj):
-            if isinstance(obj, HexBytes) or isinstance(obj, bytes):
-                return obj.hex()
-            if isinstance(obj, AttributeDict):
-                return dict(obj)
-            return super().default(obj)
-
-    class JSONifiedState(EventScannerState):
-        """Store the state of scanned blocks and all events.
-
-        All state is an in-memory dict.
-        Simple load/store massive JSON on start up.
-        """
-
-        def __init__(self):
-            # self.state = None
-            self.state = {}
-            self.fname = "test-state.json"
-            # How many second ago we saved the JSON file
-            self.last_save = 0
-
-        def reset(self):
-            """Create initial state of nothing scanned."""
-            self.state = {
-                "last_scanned_block": 0,
-                "blocks": {},
-            }
-
-        def restore(self):
-            """Restore the last scan state from a file."""
-            try:
-                self.state = json.load(open(self.fname, "rt"))
-                print(f"Restored the state, previously {self.state['last_scanned_block']} blocks have been scanned")
-            
-            except (IOError, json.decoder.JSONDecodeError):
-                print("State starting from scratch")
-                self.reset()
-
-        def save(self):
-            """Save everything we have scanned so far in a file."""
-            with open(self.fname, "wt") as f:
-                json.dump(self.state, f, cls=HexJsonEncoder)
-
-            self.last_save = time.time()
-
-        #
-        # EventScannerState methods implemented below
-        #
-
-        def get_last_scanned_block(self):
-            """The number of the last block we have stored."""
-            return self.state["last_scanned_block"]
-
-        def delete_data(self, since_block):
-            """Remove potentially reorganised blocks from the scan data."""
-            for block_num in range(since_block, self.get_last_scanned_block()):
-                if block_num in self.state["blocks"]:
-                    del self.state["blocks"][block_num]
-
-        def start_chunk(self, block_number, chunk_size):
-            pass
-
-        def end_chunk(self, block_number):
-            """Save at the end of each block, so we can resume in the case of a crash or CTRL+C"""
-            # Next time the scanner is started we will resume from this block
-            self.state["last_scanned_block"] = block_number
-
-            # Save the database file for every minute
-            if time.time() - self.last_save > 60:
-                self.save()
-
-        def process_event(
-            self, 
-            block_when: datetime.datetime, 
-            event: EventData
-        ) -> str:
-            """Record event in database.
-
-            Args:
-                block_when (datetime.datetime): _description_
-                event (EventData): _description_
-
-            Returns:
-                str: _description_
-            """
-            # Events are keyed by their transaction hash and log index
-            # One transaction may contain multiple events
-            # and each one of those gets their own log index
-
-            event_name = event.event                    # type: ignore ; "Transfer"
-            log_index = event.logIndex                  # type: ignore ; Log index within the block 
-            txhash = event.transactionHash.hex()        # type: ignore ; Transaction hash
-            block_number = event.blockNumber            # type: ignore
-
-            # Convert ERC-20 Transfer event to our internal format
-            args = event["args"]
-            # _transfer = {
-            #     "from": args["from"],
-            #     "to": args.to,
-            #     "value": args.value,
-            #     "timestamp": block_when.isoformat(),
-            # }
-            dto = {
-                "event": event_name,
-                "data": args,
-                "timestamp": block_when.isoformat(),
-            }
-            # print()
-            # print(f"log_index    : {log_index}")
-            # print(f"txhash       : {txhash}")
-            # print(f"block_number : {block_number}")
-            # print(dto)
-            # print()
-
-            # Create empty dict as the block that contains all transactions by txhash
-            if block_number not in self.state["blocks"]:
-                self.state["blocks"][block_number] = {}
-
-            block = self.state["blocks"][block_number]
-            if txhash not in block:
-                # We have not yet recorded any transfers in this transaction
-                # (One transaction may contain multiple events if executed by a smart contract).
-                # Create a tx entry that contains all events by a log index
-                self.state["blocks"][block_number][txhash] = {}
-
-            # Record event in database as bytes
-            self.state["blocks"][block_number][txhash][log_index] = dto
-
-            # Return a pointer that allows us to look up this event later if needed
-            return f"{block_number}-{txhash}-{log_index}"
+    
 
     def run():
 
@@ -797,50 +836,38 @@ if __name__ == "__main__":
         chain_id = int(sys.argv[1])
         config = get_blockchain_config(chain_id)
         abi = get_abi(chain_id)
-
-
-        # print(config.__dict__)
-        # Enable logs to the stdout.
-        # DEBUG is very verbose level
-        logging.basicConfig(level=logging.INFO)
-
         rpc_url = f"{config.rpc_url}{config.project_id}"
-        print(f"rpc_url={rpc_url}")
         provider = HTTPProvider(rpc_url)
-
-        # Remove the default JSON-RPC retry middleware
-        # as it correctly cannot handle eth_getLogs block range
-        # throttle down.
         
         # provider.middlewares[0].clear()
         provider.middlewares.clear() # type: ignore
 
         w3: Web3 = Web3(provider)
-        print(w3.client_version)
-        
+                
         # if config.client == "middleware":
         #     w3.middleware_onion.inject(geth_poa_middleware, layer=0)
 
-        # Prepare stub ERC-20 contract object
-        # abi = json.loads(ABI)
-        # contract = w3.eth.contract(abi=abi)
         contract = w3.eth.contract(
             Web3.to_checksum_address(config.smart_contract_address),  
             abi=abi
         )
 
-        events: List[type[BaseContractEvent]] = [
-            contract.events.OperationCreated,
-            contract.events.FeesLockedConfirmed,
-            contract.events.FeesLockedAndDepositConfirmed,
-            contract.events.FeesDeposited,
-            contract.events.FeesDepositConfirmed,
-            contract.events.OperationFinalized,
-        ]
+        try:
+            events: List[type[BaseContractEvent]] = [
+                contract.events.OperationCreated,
+                contract.events.FeesLockedConfirmed,
+                contract.events.FeesLockedAndDepositConfirmed,
+                contract.events.FeesDeposited,
+                contract.events.FeesDepositConfirmed,
+                contract.events.OperationFinalized,
+            ]
+        except ABIEventFunctionNotFound as e:
+            print(f"Error! \n{e.args[0]} \n{e.args[1]}")
+            sys.exit()
 
         # Restore/create our persistent state
-        state = JSONifiedState()
-        state.restore()
+        state = JSONifiedState(chain_id=chain_id)
+        state.restore()    
 
         scanner = EventScanner(
             chain_id=chain_id,
@@ -855,11 +882,13 @@ if __name__ == "__main__":
         )
         
         title_length = 20
+        print(f"{"rpc_url":<{title_length}} : {rpc_url}")
+        print(f"{"client version":<{title_length}} : {w3.client_version}")
         print(f"{"chain_id":<{title_length}} : {chain_id}")
         print(f"{"Account address":<{title_length}} : {scanner.address}")
         print(f"{"Contract address":<{title_length}} : {config.smart_contract_address}")
         print(f"{"genesis block":<{title_length}} : {config.genesis_block}")
-
+        
         # Assume we might have scanned the blocks all the way to the last Ethereum block
         # that mined a few seconds before the previous scan run ended.
         # Because there might have been a minor Ethereum chain reorganisations
@@ -875,15 +904,8 @@ if __name__ == "__main__":
         start_block = max(
             state.get_last_scanned_block() - chain_reorg_safety_blocks,
             config.genesis_block,
-        )
-
-        # print(f"state.get_last_scanned_block()={state.get_last_scanned_block()}")
-        # print(f"chain_reorg_safety_blocks={chain_reorg_safety_blocks}")
-        # print(f"config.genesis_block={config.genesis_block}")
-        
-
+        )       
         print(f"{"start_block":<{title_length}} : {start_block}")
-        # sys.exit()
 
         end_block = scanner.get_suggested_scan_end_block()
         print(f"{"end_block":<{title_length}} : {end_block}")
@@ -899,7 +921,7 @@ if __name__ == "__main__":
                 start_block: int, 
                 end_block: int, 
                 current_block: int, 
-                current_block_timestamp: datetime.datetime, 
+                current_block_timestamp: Optional[datetime.datetime], 
                 chunk_size: int, 
                 events_count: int,
             ):
@@ -925,4 +947,79 @@ if __name__ == "__main__":
             f"seconds, total {total_chunks_scanned} chunk scans performed"
         )
 
-    run()
+    def register_events():
+        """"""
+        chain_id = str(sys.argv[1])
+        state = JSONifiedState(chain_id=chain_id)
+        register = RegisterEvents(chain_id=chain_id)
+        state.restore()
+        register.restore()
+        
+        blocks_validated = []
+        blocks = state.state[chain_id]['blocks']
+        register_blocks = register.state[chain_id]['blocks']
+        total_events = 0
+        total_tx = 0
+        total_to_register = 0
+        total_registered = 0
+
+        register_events = []
+
+        for block_number in blocks:
+            
+            # manage duplicate block number
+            if block_number in blocks_validated:
+                continue
+            
+            blocks_validated.append(block_number)
+            
+            # only register new event and set status to register
+            if register_blocks.get(block_number, None) is None:
+                # Register the events
+                for tx in blocks[block_number]:
+                    total_tx += 1
+                    for evt_idx, evt in blocks[block_number][tx].items():
+                        total_events += 1
+                        total_to_register += 1
+                        evt["bridge_status"] = "to_register"
+                        key = (block_number, tx, evt_idx, 'bridge_status')
+                        register_events.append(key)
+            else:
+                # The block number exist but we need to check
+                # tx and logs
+                for tx in blocks[block_number]:
+                    total_tx += 1
+                    for evt_idx, evt in blocks[block_number][tx].items():
+                        total_events += 1
+                        if register_blocks[block_number].get(tx, None) is None:
+                            # evt does not exit and needs to be registered
+                            total_to_register += 1
+                            evt["bridge_status"] = "to_register"
+                            key = (block_number, tx, evt_idx, 'bridge_status')
+                            register_events.append(key)
+                        else:
+                            revt = register_blocks[block_number][tx][evt_idx]
+                            evt["bridge_status"] = revt['bridge_status']
+                            if 'registered' in evt["bridge_status"]:
+                                total_registered += 1
+                            else:
+                                total_to_register += 1
+
+        # stats
+        state.state[chain_id]['stats'] = {
+            "total_blocks": len(state.state[chain_id]["blocks"]),
+            "total_tx": total_tx,
+            "total_events": total_events,
+            "total_to_register": total_to_register,
+            "total_registered": total_registered,
+        }
+
+        register.state = state.state
+        register.save()
+        
+
+
+    while True:
+        run()
+        register_events()
+        time.sleep(1)

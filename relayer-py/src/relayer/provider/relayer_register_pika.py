@@ -328,7 +328,6 @@ class RelayerRegisterEvent(RelayerLogging, IRelayerRegister):
         channel.basic_qos(prefetch_count=prefetch_count)
         return channel
 
-
     def _consume_message(
         self,
         routing_key: str,

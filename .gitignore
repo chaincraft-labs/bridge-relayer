@@ -1,5 +1,6 @@
 # Custom
-test-state.json
+test-state*.json
+data/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

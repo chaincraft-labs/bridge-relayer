@@ -47,3 +47,43 @@ port = "{{ RELAYER_REGISTER_PORT }}"
 user = "{{ RELAYER_REGISTER_USER }}"
 password = "{{ RELAYER_REGISTER_PASSWORD }}"
 queue_name = "{{ RELAYER_REGISTER_QUEUE_NAME }}"
+
+[relayer_event_rules]
+    # event_name: str
+    # origin: str
+    # has_block_finality: bool
+    # chain_func_name: Optional[str] = None
+    # func_name: Optional[str] = None
+    # func_condition: Optional[str] = None
+    
+    [relayer_event_rules.OperationCreated]
+    origin = "chainIdFrom"
+    has_block_finality = true
+
+    [relayer_event_rules.FeesDeposited]
+    origin = "chainIdTo"
+    has_block_finality = true
+    chain_func_name = 'chainIdTo'
+    func_name = "SendFeesLockConfirmation"
+
+    [relayer_event_rules.FeesDepositConfirmed]
+    origin = "chainIdTo"
+    has_block_finality = false
+    chain_func_name = 'chainIdFrom'
+    func_name = "ReceiveFeesLockConfirmation"
+
+    [relayer_event_rules.FeesLockedConfirmed]
+    origin = "chainIdFrom"
+    has_block_finality = false
+    chain_func_name = 'chainIdFrom'
+    func_name = "confirmFeesLockedAndDepositConfirmed"
+
+    [relayer_event_rules.FeesLockedAndDepositConfirmed]
+    origin = "chainIdFrom"
+    has_block_finality = false
+    chain_func_name = 'chainIdTo'
+    func_name = "completeOperation"
+
+    [relayer_event_rules.OperationFinalized]
+    origin = "chainIdTo"
+    has_block_finality = false

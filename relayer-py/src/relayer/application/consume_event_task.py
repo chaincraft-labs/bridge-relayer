@@ -7,9 +7,13 @@ from src.relayer.application.execute_contract import ExecuteContractTask
 from src.relayer.domain.exception import (
     BlockFinalityTimeExceededError,
     BridgeRelayerConfigBlockchainDataMissing,
+    BridgeRelayerConfigEventRuleKeyError,
     EventConverterTypeError
 )
-from src.relayer.domain.config import RelayerBlockchainConfigDTO
+from src.relayer.domain.config import (
+    EventRuleConfig, 
+    RelayerBlockchainConfigDTO
+)
 from src.utils.converter import from_bytes
 from src.relayer.interface.relayer import (
     IRelayerBlockchain,
@@ -22,10 +26,13 @@ from src.relayer.domain.relayer import (
     BridgeTaskDTO,
     EventDTO,
 )
-from src.relayer.config.config import get_blockchain_config
+from src.relayer.config.config import (
+    get_blockchain_config,
+    get_relayer_event_rule,
+)
+from src.relayer.application.base_logging import RelayerLogging
 
-
-class ConsumeEventTask(BaseApp):
+class ConsumeEventTask(RelayerLogging, BaseApp):
     """Bridge relayer consumer event task."""
 
     def __init__(
@@ -47,6 +54,7 @@ class ConsumeEventTask(BaseApp):
             allocated_time (int, optional): Time in second allocated \
                 to wait for block finality
         """
+        super().__init__()
         self.rb_provider: IRelayerBlockchain = relayer_blockchain_provider
         self.rr_provider: IRelayerRegister = relayer_consumer_provider
         self.verbose: bool = verbose
@@ -56,7 +64,8 @@ class ConsumeEventTask(BaseApp):
 
     def __call__(self) -> None:
         """Consumer worker."""
-        self.print_log("main", "Waiting for events. To exit press CTRL+C'")
+        # self.print_log("main", "Waiting for events. To exit press CTRL+C'")
+        self.logger.info(f"{self.Emoji.main.value}Waiting for events. To exit press CTRL+C'")
         self.rr_provider.read_events(callback=self._callback)
 
     def store_operation_hash(
@@ -93,9 +102,7 @@ class ConsumeEventTask(BaseApp):
             Read the `wait_block_validation` defined in
             src.relayer.config.bridge_relayer_config.toml
             `wait_block_validation` means how long it takes for a block to \
-                be finalized
-
-            It must be the slowest blockchain.
+            be finalized. It must be the slowest blockchain.
 
         Args:
             event_dto (EventDTO): The chain id
@@ -106,7 +113,6 @@ class ConsumeEventTask(BaseApp):
                 err: An error
         """
         result = DefineChainBlockFinalityResult()
-
         chain_a = event_dto.data['params']['chainIdFrom']
         chain_b = event_dto.data['params']['chainIdTo']
 
@@ -139,7 +145,7 @@ class ConsumeEventTask(BaseApp):
         """Define the block step according to the chain id.
 
         The chain id provided is defined to validate block finality.
-        Block step may be the one already saved or the one comming from event
+        block_step may be the one already saved or the one comming from event
 
         Args:
             chain_id (int): The chain id defined for validate block finality
@@ -173,10 +179,18 @@ class ConsumeEventTask(BaseApp):
         result = CalculateBlockFinalityResult()
 
         try:
-            blockchain_config: RelayerBlockchainConfigDTO = \
-                get_blockchain_config(chain_id=chain_id)
-            wait_block_validation = blockchain_config.wait_block_validation
-            result.ok = block_step + wait_block_validation
+            cfg: RelayerBlockchainConfigDTO = get_blockchain_config(
+                chain_id=chain_id
+            )
+            wait_block_validation = cfg.wait_block_validation
+            second_per_block = cfg.block_validation_second_per_block
+            block_finality_in_sec = wait_block_validation * second_per_block
+            block_finality = block_step + wait_block_validation
+
+            result.ok = (
+                block_finality,
+                block_finality_in_sec,
+            )
 
         except BridgeRelayerConfigBlockchainDataMissing as e:
             result.err = (
@@ -192,18 +206,36 @@ class ConsumeEventTask(BaseApp):
         self,
         chain_id: int,
         block_finality: int,
+        block_finality_in_sec: int,
     ) -> None:
         """Validate the block finality
 
         Args:
             chain_id (int): The chain id
-            block_finality (int): The block number target
+            block_finality (int): The block number finality target
+            block_finality_in_sec (int): The block finality in second
 
         """
         self.rb_provider.set_chain_id(chain_id=chain_id)
+        block_number = await self.rb_provider.get_block_number()
+        self.logger.info(
+            f"{self.Emoji.blockFinality.value}block_number={block_number} "
+            f"block_finality={block_finality}"
+        )
+        
         elapsed_time = 0
-
         while True:
+            if elapsed_time == 0 and block_number <= block_finality:
+                message = (
+                    f"Wait for block finality {block_number}/{block_finality} "
+                    f"chain_id={chain_id} block_finality_in_sec={block_finality_in_sec}"
+                )
+                self.logger.info(f"{self.Emoji.wait.value}{message}")
+                await asyncio.sleep(block_finality_in_sec)
+                elapsed_time = block_finality_in_sec
+            else:
+                elapsed_time = block_finality_in_sec
+
             if elapsed_time >= self.allocated_time:
                 raise BlockFinalityTimeExceededError(
                     "Block finality validation has exceeded the allocated"
@@ -213,67 +245,53 @@ class ConsumeEventTask(BaseApp):
             block_number = await self.rb_provider.get_block_number()
 
             if block_number >= block_finality:
+                message = (
+                    f"Block finality validated! block_number={block_number} "
+                    f">= block_finality={block_finality} chain_id={chain_id}"
+                )
+                self.logger.info(f"{self.Emoji.success.value}{message}")
                 return block_number
-
-            message = (
-                f"wait for block finality {block_number}/{block_finality} "
-                f"chain_id={chain_id} "
-                f"allocated_time={self.allocated_time} (sec) "
-                f"sleep={self.sleep} (sec)"
-            )
-            self.print_log("wait", message)
+            
             await asyncio.sleep(self.sleep)
             elapsed_time += 1
 
     def manage_validate_block_finality(
         self,
-        event_dto: EventDTO,
-        saved_chain_id: int,
-        saved_block_step: int,
+        chain_id: int,
+        block_step: int,
     ) -> BlockFinalityResult:
         """Manage the block finality validation.
 
-            1. define the chain id the block finality is process to
-            2. define the current block number
-            3. calculate the block number target
-            4. validate the block finality
-
         Args:
-            event_dto (EventDTO): The event dto
-            saved_chain_id (int): The saved chain id from a previous event
-            saved_block_step (int): The saved block step from a previous event
+            chain_id (int): The chain id 
+            block_step (int): The block step
 
         Returns:
             BlockFinalityResult: The result
         """
-        self.print_log("blockFinality", "Validating block finality ...")
+        # self.print_log("blockFinality", "Validating block finality ...")
+        # self.logger.info(f"{self.Emoji.blockFinality.value}Validating block finality ...")
+        
         result = BlockFinalityResult()
-        block_step: int = event_dto.data['blockStep']
-
-        chain_id_result = self.define_chain_for_block_finality(
-            event_dto=event_dto,
-        )
-        if chain_id_result.err:
-            return chain_id_result
-
-        current_block_step = self.define_block_step_for_block_finality(
-            chain_id=chain_id_result.ok,
-            current_block_step=block_step,
-            saved_chain_id=saved_chain_id,
-            saved_block_step=saved_block_step,
-        )
 
         block_finality_result = self.calculate_block_finality(
-            chain_id=chain_id_result.ok,
-            block_step=current_block_step,
+            chain_id=chain_id,
+            block_step=block_step,
         )
+
         if block_finality_result.err:
             return block_finality_result
 
+        (
+            block_finality,
+            block_finality_in_sec
+        ) = block_finality_result.ok
+
         try:
             block_number = asyncio.run(self.validate_block_finality(
-                chain_id=chain_id_result.ok,
-                block_finality=block_finality_result.ok,
+                chain_id=chain_id,
+                block_finality=block_finality,
+                block_finality_in_sec=block_finality_in_sec
             ))
             result.ok = ("Success", block_number)
         except BlockFinalityTimeExceededError as e:
@@ -319,57 +337,91 @@ class ConsumeEventTask(BaseApp):
                 f"Error={e}"
             )
 
-    def _callback(self, event: bytes) -> None:
-        """Handle the consumed events
-
-        Event                           | finality  | condition
-        --------------------------------+-----------+----------------------
-        OperationCreated                |   Yes     |   FeesLockedConfirmed
-        FeesLockedConfirmed             |   Yes     |   OperationCreated
-        FeesLockedAndDepositConfirmed   |   No      |   NA
-        FeesDeposited                   |   Yes     |   NA
-        FeesDepositConfirmed            |   No      |   NA
-        OperationFinalized              |   No      |   NA
+    def manage_event_with_rules_v2(self, event: EventDTO) -> None:
+        """Manage event based on rules
 
         Args:
-            event (bytes): The Event
+            event (EventDTO): The event DTO
+
+        Returns:
+            _type_: _description_
         """
         try:
-            event_dto: EventDTO = self._convert_data_from_bytes(event=event)
-        except EventConverterTypeError as e:
-            self.print_log("fail", f"Error={e}")
-            return
-
-        params: int = event_dto.data['params']
-        chain_id_from: int = event_dto.data['params']['chainIdFrom']
-        chain_id_to: int = event_dto.data['params']['chainIdTo']
-        block_step: int = event_dto.data['blockStep']
-        operation_hash: str = event_dto.data['operationHash']
-        event_name: str = event_dto.name
-
-        self.print_log("receiveEvent", f"Consume event={event_dto.as_dict()}")
-
-        if event_name in ['OperationCreated', 'FeesLockedConfirmed']:
-            # Store event data
-            if self.store_operation_hash(
-                operation_hash=operation_hash,
-                chain_id=chain_id_from,
-                block_step=block_step,
-            ):
-                return
+            cfg: EventRuleConfig = get_relayer_event_rule(event.name)
 
             # Validate block finality
-            saved_data = self.operation_hash_events[operation_hash]
-            saved_chain_id = saved_data['chain_id']
-            saved_block_step = saved_data['block_step']
+            if cfg.has_block_finality:
+                result: BlockFinalityResult = self.manage_validate_block_finality(
+                    chain_id=event.data['params'][cfg.origin],
+                    block_step=event.data['blockStep'],
+                )
+                if result.err:
+                    return result
 
-            result = self.manage_validate_block_finality(
-                event_dto=event_dto,
-                saved_chain_id=saved_chain_id,
-                saved_block_step=saved_block_step,
+            # Execute a smart contract function
+            if cfg.func_name is not None and cfg.chain_func_name is not None:
+                self.execute_smart_contract_function(
+                    chain_id=event.data['params'][cfg.chain_func_name],
+                    func_name=cfg.func_name,
+                    params={
+                        "operationHash": event.data['operationHash'],
+                        "params": event.data['params'],
+                        "blockStep": event.data['blockStep'],
+                    }
+                )
+
+        except BridgeRelayerConfigEventRuleKeyError as e:
+            self.logger.error(f"{self.Emoji.fail.value}Unknown event {event.name}, Error={e}")
+            return
+
+    def manage_event_with_rules_v1(self, event: EventDTO) -> None:
+        """Manage event based on rules
+
+        Args:
+            event (EventDTO): The event DTO
+
+        Returns:
+            _type_: _description_
+        """
+        params: int = event.data['params']
+        chain_id_from: int = event.data['params']['chainIdFrom']
+        chain_id_to: int = event.data['params']['chainIdTo']
+        block_step: int = event.data['blockStep']
+        operation_hash: str = event.data['operationHash']
+        event_name: str = event.name
+
+        self.logger.info(f"{self.Emoji.receiveEvent.value}Consume event={event.as_dict()}")
+
+        if event_name == 'OperationCreated':
+            result: BlockFinalityResult = self.manage_validate_block_finality(
+                chain_id=event.data['params']['chainIdFrom'],
+                block_step=event.data['blockStep'],
             )
             if result.err:
                 return result
+
+
+        elif event_name == 'FeesLockedConfirmed':
+            # # Store event data
+            # store_status = self.store_operation_hash(
+            #     operation_hash=operation_hash,
+            #     chain_id=chain_id_from,
+            #     block_step=block_step,
+            # )
+            # if store_status:
+            #     return
+
+            # Validate block finality
+            # saved_data = self.operation_hash_events[operation_hash]
+            # saved_chain_id = saved_data['chain_id']
+            # saved_block_step = saved_data['block_step']
+
+            # result: BlockFinalityResult = self.manage_validate_block_finality(
+            #     chain_id=saved_chain_id,
+            #     block_step=saved_block_step,
+            # )
+            # if result.err:
+            #     return result
 
             self.execute_smart_contract_function(
                 chain_id=chain_id_from,
@@ -381,27 +433,33 @@ class ConsumeEventTask(BaseApp):
                 }
             )
 
-            del self.operation_hash_events[operation_hash]
+            # del self.operation_hash_events[operation_hash]
 
         elif event_name == "FeesLockedAndDepositConfirmed":
             self.execute_smart_contract_function(
                 chain_id=chain_id_to,
                 func_name="completeOperation",
                 params={
-                    "operationHash": operation_hash,
+                    "_operationHash": operation_hash, # bad param name _operationHash vs operationHash
                     "params": params,
                     "blockStep": block_step,
                 }
             )
 
         elif event_name == "FeesDeposited":
-            result = self.manage_validate_block_finality(
-                event_dto=event_dto,
-                saved_chain_id=chain_id_to,
-                saved_block_step=block_step,
+            result: BlockFinalityResult = self.manage_validate_block_finality(
+                chain_id=event.data['params']['chainIdTo'],
+                block_step=event.data['blockStep'],
             )
             if result.err:
                 return result
+            
+            # result = self.manage_validate_block_finality(
+            #     chain_id=chain_id_to,
+            #     block_step=block_step,
+            # )
+            # if result.err:
+            #     return result
 
             # Execute task
             self.execute_smart_contract_function(
@@ -422,7 +480,7 @@ class ConsumeEventTask(BaseApp):
                     "operationHash": operation_hash,
                     "params": params,
                     # "blockStep": block_step,
-                    # "operator": event_dto.data.params.operator,
+                    # "operator": event.data.params.operator,
                     "operator": "0x0000000000000000000000000000000000000000",
                 }
             )
@@ -439,4 +497,31 @@ class ConsumeEventTask(BaseApp):
             )
 
         else:
-            self.print_log("alert", f"Ignore event={event_dto.as_dict()}")
+            self.logger.warning(
+                f"{self.Emoji.alert.value}Ignore event={event.as_dict()}"
+            )
+
+    def _callback(self, event: bytes) -> None:
+        """Handle the consumed events
+
+        Event                           | finality  | condition
+        --------------------------------+-----------+----------------------
+        OperationCreated                |   Yes     | FeesLockedConfirmed
+        FeesLockedConfirmed             |   Yes     | OperationCreated
+        FeesLockedAndDepositConfirmed   |   No      | NA
+        FeesDeposited                   |   Yes     | NA
+        FeesDepositConfirmed            |   No      | NA
+        OperationFinalized              |   No      | NA
+
+        Args:
+            event (bytes): The Event
+        """
+        try:
+            event_dto: EventDTO = self._convert_data_from_bytes(event=event)
+        except EventConverterTypeError as e:
+            self.logger.error(f"{self.Emoji.fail.value}Error={e}")
+            return
+
+        # self.manage_event_with_rules_v2(event=event_dto)
+        # Delete v1 after SM cleanup and enable v2
+        return self.manage_event_with_rules_v1(event=event_dto)

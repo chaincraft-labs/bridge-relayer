@@ -13,9 +13,11 @@ from tests.conftest import DATA_TEST
 @pytest.fixture(scope="function")
 def event_dto():
     event = DATA_TEST.EVENT_SAMPLE.copy()
+    block_key = f"{event.blockNumber}-{event.transactionHash.hex()}-{event.logIndex}"
     return EventDTO(
         name=event.event, # type: ignore
         data=event.args , # type: ignore
+        block_key=block_key,
     )
 
 # -------------------------------------------------------

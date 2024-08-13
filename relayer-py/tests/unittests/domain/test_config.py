@@ -16,6 +16,7 @@ def blockchain_config():
         project_id=DATA_TEST.PROJECT_ID,
         pk=DATA_TEST.PK,
         wait_block_validation=DATA_TEST.WAIT_BLOCK_VALIDATION,
+        block_validation_second_per_block=DATA_TEST.BLOCK_VALIDATION_SECOND_PER_BLOCK,
         smart_contract_address=DATA_TEST.SMART_CONTRACT_ADDRESS,
         genesis_block=DATA_TEST.GENESIS_BLOCK,
         abi=DATA_TEST.ABI[DATA_TEST.ABI_NAME],
@@ -44,6 +45,7 @@ def test_relayer_blockchain_config_dto_instantiate_success(blockchain_config):
     assert blockchain_config.abi == DATA_TEST.ABI[DATA_TEST.ABI_NAME]
     assert blockchain_config.pk == DATA_TEST.PK
     assert blockchain_config.wait_block_validation == DATA_TEST.WAIT_BLOCK_VALIDATION
+    assert blockchain_config.block_validation_second_per_block == DATA_TEST.BLOCK_VALIDATION_SECOND_PER_BLOCK
     
 def test_relayer_blockchain_config_dto_as_dict(blockchain_config):
     """Test RelayProviderConfigDTO that returns a dict."""
@@ -56,7 +58,8 @@ def test_relayer_blockchain_config_dto_as_dict(blockchain_config):
         "abi": DATA_TEST.ABI[DATA_TEST.ABI_NAME],
         "pk": DATA_TEST.PK,
         "client": DATA_TEST.CLIENT,
-        "wait_block_validation": DATA_TEST.WAIT_BLOCK_VALIDATION
+        "wait_block_validation": DATA_TEST.WAIT_BLOCK_VALIDATION,
+        "block_validation_second_per_block": DATA_TEST.BLOCK_VALIDATION_SECOND_PER_BLOCK
     }
     assert asdict(blockchain_config) == expected
 

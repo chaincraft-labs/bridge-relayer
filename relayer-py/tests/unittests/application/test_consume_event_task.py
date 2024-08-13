@@ -1,19 +1,22 @@
+import logging
 from unittest.mock import MagicMock, patch
 import pytest
 
 from src.relayer.application.consume_event_task import ConsumeEventTask
 from src.relayer.domain.exception import (
-    BlockFinalityTimeExceededError, 
+    BlockFinalityTimeExceededError,
     EventConverterTypeError
 )
 from src.relayer.domain.relayer import (
     BlockFinalityResult,
     BridgeTaskDTO,
     CalculateBlockFinalityResult,
-    DefineChainBlockFinalityResult,
     EventDTO,
 )
-from src.relayer.provider.mock_relayer_blockchain_web3 import (
+from src.relayer.domain.config import (
+    RelayerBlockchainConfigDTO, 
+)
+from src.relayer.provider.mock_relayer_blockchain_web3_v2 import (
     MockRelayerBlockchainProvider
 )
 from src.relayer.provider.mock_relayer_register_pika import (
@@ -29,6 +32,14 @@ EVENT_FILTERS = ['FAKE_EVENT_NAME']
 # -------------------------------------------------------
 # F I X T U R E S
 # -------------------------------------------------------
+@pytest.fixture(autouse=True)
+def disable_logging():
+    # Désactiver les logs pendant les tests
+    logging.disable(logging.CRITICAL)
+    yield
+    # Réactiver les logs après les tests
+    logging.disable(logging.NOTSET)
+    
 @pytest.fixture(scope="function")
 def blockchain_provider(request):
     # parameters for MockChainProvider
@@ -50,9 +61,11 @@ def register_provider(request):
 @pytest.fixture(scope="function")
 def event_dto():
     event = DATA_TEST.EVENT_SAMPLE.copy()
+    block_key = f"{event.blockNumber}-{event.transactionHash.hex()}-{event.logIndex}"
     return EventDTO(
         name=event.event, # type: ignore
-        data=event.args , # type: ignore
+        data=event.args, # type: ignore
+        block_key=block_key
     )
 
 @pytest.fixture(scope="function")
@@ -71,6 +84,21 @@ def consume_event_task(blockchain_provider, register_provider):
         verbose=False
     )
 
+@pytest.fixture
+def get_blockchain_config():
+    config = RelayerBlockchainConfigDTO(
+        chain_id=123, 
+        rpc_url='https://fake.rpc_url.org', 
+        project_id='JMFW2926FNFKRMFJF1FNNKFNKNKHENFL', 
+        pk='abcdef12345678890abcdef12345678890abcdef12345678890abcdef1234567', 
+        wait_block_validation=6, 
+        block_validation_second_per_block=0,
+        smart_contract_address='0x1234567890abcdef1234567890abcdef12345678', 
+        genesis_block=123456789, 
+        abi=[{}], 
+        client='middleware'
+    )
+    return config
 # -------------------------------------------------------
 # T E S T S
 # -------------------------------------------------------
@@ -136,107 +164,32 @@ def test_store_operation_hash( consume_event_task, event_dto):
     assert result2 is False
     assert app.operation_hash_events[op_hash] == expected
 
-@pytest.mark.parametrize('chain_ids, expected', [
-    ([123, 456], 123),
-    ([456, 123], 123),
-    ([456, 789], 456),
-])
-def test_define_chain_for_block_finality_chain_a_success(
+def test_calculate_block_finality_success(
     consume_event_task, 
-    event_dto,
-    chain_ids,
-    expected,
+    get_blockchain_config
 ):
-    """
-        Test define_chain_for_block_finality that returns 
-        the chain id with the greatest `wait_block_validation` value.
-        `wait_block_validation` is defined in 
-        src.relayer.config.bridge_relayer_config_dev.toml
-        -> How long it takes for a block to be finalized
-    """
-    print()
-    app = consume_event_task
-    # chain id 123  wait_block_validation = 6
-    # chain id 456    wait_block_validation = 1
-    # chain id 789   wait_block_validation = 1
-    event_dto.data['params']['chainIdFrom'] = chain_ids[0]
-    event_dto.data['params']['chainIdTo'] = chain_ids[1]
-    result = app.define_chain_for_block_finality(event_dto=event_dto)
-
-    # Tests
-    assert isinstance(result, DefineChainBlockFinalityResult)
-    assert result.ok == expected
-
-def test_define_chain_for_block_finality_fail_with_invalid_chain_id(     
-    consume_event_task, 
-    event_dto
-):
-    """
-        Test define_chain_for_block_finality that returns 
-        the chain id with the greatest `wait_block_validation` value.
-        `wait_block_validation` is defined in 
-        src.relayer.config.bridge_relayer_config_dev.toml
-        -> How long it takes for a block to be finalized
-    """
-    app = consume_event_task
-    event_dto.data['params']['chainIdFrom'] = 123456
-    result = app.define_chain_for_block_finality(event_dto=event_dto)
-
-    # Tests
-    assert isinstance(result, DefineChainBlockFinalityResult)
-    assert "Invalid chain ID" in result.err
-
-def test_define_block_step_for_block_finality(consume_event_task, event_dto):
-    """
-        Test define_block_step_for_block_finality that returns the block
-        number to use to calculate and validate the block finality.
-    """
-    app = consume_event_task
-    
-    # Simulate a first event received
-    # chain_id = 80002
-    # block_step = 7866062
-    app.store_operation_hash(
-        operation_hash=event_dto.data['operationHash'],
-        chain_id=event_dto.data['params']['chainIdFrom'],
-        block_step=event_dto.data['blockStep'],
-    )
-
-    block_step_1 = app.define_block_step_for_block_finality(
-        chain_id=123,
-        current_block_step=123456,
-        saved_chain_id=80002,
-        saved_block_step=7866062,
-    )
-
-    block_step_2 = app.define_block_step_for_block_finality(
-        chain_id=80002,
-        current_block_step=123456,
-        saved_chain_id=80002,
-        saved_block_step=7866062,
-    )
-    
-    assert block_step_1 == 123456
-    assert block_step_2 == 7866062
-
-def test_calculate_block_finality_success(consume_event_task):
     """
         Test calculate_block_finality that returns the block number target
         to wait until block finality.
         As it reads the config the chain id must exist
+        wait_block_validation = 6
+        block_step = 10
+        block_validation_second_per_block = 0
+        block_finality = 16 = wait_block_validation + block_step
+        block_finality_in_sec = 0 = wait_block_validation * block_validation_second_per_block
     """
     app = consume_event_task
-    chain_id = 80002 # wait_block_validation = 6
-    
-    result = app.calculate_block_finality(
-        chain_id=chain_id,
-        block_step=10
-    )
 
-    assert isinstance(result, CalculateBlockFinalityResult)
-    assert result.ok == 16
+    with patch(
+        'src.relayer.application.consume_event_task.get_blockchain_config',
+        return_value=get_blockchain_config
+    ):
+        result = app.calculate_block_finality(chain_id=123, block_step=10)
 
-def test_calculate_block_finality_failed_with_invalid_chai_id(
+        assert isinstance(result, CalculateBlockFinalityResult)
+        assert result.ok == (16, 0)
+
+def test_calculate_block_finality_failed_with_invalid_chain_id(
     consume_event_task
 ):
     """
@@ -246,12 +199,8 @@ def test_calculate_block_finality_failed_with_invalid_chai_id(
         In this test we provide an invalid chain id
     """
     app = consume_event_task
-    chain_id = 12345
     
-    result = app.calculate_block_finality(
-        chain_id=chain_id,
-        block_step=10
-    )
+    result = app.calculate_block_finality(chain_id=12345, block_step=10)
 
     assert isinstance(result, CalculateBlockFinalityResult)
     assert "Invalid chain ID" in result.err
@@ -275,6 +224,7 @@ async def test_block_validation(blockchain_provider, consume_event_task):
     await app.validate_block_finality(
         chain_id=1337, 
         block_finality=5, 
+        block_finality_in_sec=0
     )
     
     blockchain_provider.get_block_number.assert_called()
@@ -304,11 +254,12 @@ async def test_block_validation_raise_with_time_exceeded(
         await app.validate_block_finality(
             chain_id=1337,
             block_finality=5,
+            block_finality_in_sec=0
         )
 
 def test_manage_validate_block_finality_err_with_time_exceeded(
     consume_event_task, 
-    event_dto
+    get_blockchain_config
 ):
     """
         Test manage_validate_block_finality that returns error if
@@ -317,83 +268,21 @@ def test_manage_validate_block_finality_err_with_time_exceeded(
     app = consume_event_task
     app.sleep = 10
     app.allocated_time = 0
-    event_dto.data['params']['chainIdTo'] = 1337
-    event_dto.data['blockStep'] = 5
-    app.store_operation_hash(
-        operation_hash=event_dto.data['operationHash'],
-        chain_id=event_dto.data['params']['chainIdFrom'],
-        block_step=event_dto.data['blockStep'],
-    )
 
-    result = app.manage_validate_block_finality(
-        event_dto=event_dto,
-        saved_chain_id=80002,
-        saved_block_step=5,
-    )
-    assert isinstance(result, BlockFinalityResult)
-    assert "Block finality validation has exceeded" in result.err
-
-def test_manage_validate_block_finality_err_with_invalid_chain_id_1(
-    consume_event_task, 
-    event_dto
-):
-    """
-        Test manage_validate_block_finality that returns error event_dto 
-        provide an invalid chain id
-    """
-    app = consume_event_task
-    app.sleep = 0
-    event_dto.data['params']['chainIdTo'] = 0
-    event_dto.data['blockStep'] = 5
-    app.store_operation_hash(
-        operation_hash=event_dto.data['operationHash'],
-        chain_id=event_dto.data['params']['chainIdFrom'],
-        block_step=event_dto.data['blockStep'],
-    )
-
-    result = app.manage_validate_block_finality(
-        event_dto=event_dto,
-        saved_chain_id=80002,
-        saved_block_step=5,
-    )
-    assert isinstance(result, DefineChainBlockFinalityResult)
-    assert "Invalid chain ID" in result.err
-
-def test_manage_validate_block_finality_err_with_invalid_chain_id_2(
-    consume_event_task, 
-    event_dto
-):
-    """
-        Test manage_validate_block_finality that returns error if
-        define_chain_for_block_finality returns invalid chain id
-    """
-    chain_id_result = DefineChainBlockFinalityResult()
-    chain_id_result.ok = 0
-    app = consume_event_task
-    app.sleep = 0
-    event_dto.data['params']['chainIdTo'] = 1337
-    event_dto.data['blockStep'] = 5
-    app.store_operation_hash(
-        operation_hash=event_dto.data['operationHash'],
-        chain_id=event_dto.data['params']['chainIdFrom'],
-        block_step=event_dto.data['blockStep'],
-    )
-
-    app.define_chain_for_block_finality = MagicMock(
-        return_value=chain_id_result
-    )
-
-    result = app.manage_validate_block_finality(
-        event_dto=event_dto,
-        saved_chain_id=80002,
-        saved_block_step=5,
-    )
-    assert isinstance(result, CalculateBlockFinalityResult)
-    assert "Invalid chain ID" in result.err
+    with patch(
+        'src.relayer.application.consume_event_task.get_blockchain_config', 
+        return_value=get_blockchain_config
+    ):
+        result = app.manage_validate_block_finality(
+            chain_id=123,
+            block_step=5,
+        )
+        assert isinstance(result, BlockFinalityResult)
+        assert "Block finality validation has exceeded" in result.err
 
 def test_manage_validate_block_finality_success(
     consume_event_task, 
-    event_dto
+    get_blockchain_config
 ):
     """
         Test manage_validate_block_finality that returns success after waiting 
@@ -403,32 +292,20 @@ def test_manage_validate_block_finality_success(
         ------------
         for chain id 1337
         blockStep = 5
-        wait_block_validation = 1
-
-        for chain id 80002
-        blockStep = 5
         wait_block_validation = 6
-
-        The process will choose chain id 80002 because it has the greatest 
-        wait_block_validation value (6).
-
-        The the block finality must be blockStep + wait_block_validation = 11
+        block finality = blockStep + wait_block_validation = 11
     """
     app = consume_event_task
     app.sleep = 0
-    event_dto.data['params']['chainIdTo'] = 1337
-    event_dto.data['blockStep'] = 5
-    app.store_operation_hash(
-        operation_hash=event_dto.data['operationHash'],
-        chain_id=event_dto.data['params']['chainIdFrom'],
-        block_step=event_dto.data['blockStep'],
-    )
 
-    result = app.manage_validate_block_finality(
-        event_dto=event_dto,
-        saved_chain_id=80002,
-        saved_block_step=5,
-    )
+    with patch(
+        'src.relayer.application.consume_event_task.get_blockchain_config',
+        return_value=get_blockchain_config
+    ):
+        result = app.manage_validate_block_finality(
+            chain_id=123,
+            block_step=5,
+        )
     assert isinstance(result, BlockFinalityResult)
     assert "Success" in result.ok[0]
     assert result.ok[1] == 11
@@ -470,138 +347,11 @@ def test_execute_smart_contract_function(
             bridge_task_dto=bridge_task_dto
         )
 
-def test_callback_returns_none_with_invalid_event(consume_event_task):
-    """Test _callback is returning None with a bad event."""
-    app = consume_event_task
-    app._convert_data_from_bytes = MagicMock(side_effect=app._convert_data_from_bytes)
-
-    event_bytes = to_bytes({"k": "v"})
-    result = app._callback(event=event_bytes)
-
-    assert result is None
-    app._convert_data_from_bytes.assert_called()
-    app._convert_data_from_bytes.assert_called_with(event=event_bytes)
-
-@pytest.mark.parametrize('event', [
-    'OperationCreated',
-    'FeesLockedConfirmed',
-])
-def test_callback_with_event_OpeartionCreated_only_store_operation_hash(
-    consume_event_task,
-    event_dto,
-    event
-):
-    """
-        Test _callback stores operation hash if it does not already exist.
-        The process is then stopped.
-
-        Event working together
-            - OpeartionCreated
-            - FeesLockedConfirmed
-    """
-    event_dto.name = event
-    operation_hash = event_dto.data['operationHash']
-    chain_id = event_dto.data['params']['chainIdFrom']
-    block_step = event_dto.data['blockStep']
-
-    app = consume_event_task
-    event_bytes = to_bytes(event_dto)
-    app._callback(event=event_bytes)
-
-    expected = {
-        'chain_id': chain_id,
-        'block_step': block_step
-    }
-    assert app.operation_hash_events[operation_hash] == expected
-
-@pytest.mark.parametrize('events', [
-    ('OperationCreated', 'FeesLockedConfirmed'),
-    ('FeesLockedConfirmed', 'OperationCreated'),
-])
-def test_callback_with_event_OpeartionCreated_and_FeesLockedConfirmed(
-    consume_event_task,
-    event_dto,
-    events,
-):
-    """
-        Test _callback that return success with both event
-            - OperationCreated
-            - FeesLockedConfirmed
-        
-        Not matter which event comes in with the same operation hash.
-        1st event, operation hash, chain id and block_step are stored
-        2nd event with the same operation hash, the process is trigger with
-            - block finality validation
-            - execute smart contract task
-    """
-    app = consume_event_task
-    # 1st event
-    event_dto.name = events[0]
-    event_bytes = to_bytes(event_dto)
-    app._callback(event=event_bytes)
-
-    # 2nd event
-    event_dto.name = events[1]
-    event_bytes = to_bytes(event_dto)
-    
-    with patch(
-        f"{PATH}.ConsumeEventTask.manage_validate_block_finality"
-    ) as mock_block_validation:
-        result = BlockFinalityResult()
-        result.ok = "Success"
-        mock_block_validation.return_value = result
-
-        with patch(f"{PATH}.ExecuteContractTask.__call__") as mock_execute:
-            result = app._callback(event=event_bytes)
-            mock_execute.assert_called()
-        mock_block_validation.assert_called()
-
-@pytest.mark.parametrize('events', [
-    ['OperationCreated', 'FeesLockedConfirmed'],
-    ['FeesDeposited']
-])
-def test_callback_manage_validate_block_finality_returns_err(
-    consume_event_task,
-    event_dto,
-    events,
-):
-    """
-        Test _callback that returns result.err if manage_validate_block_finality
-        returns error.
-        manage_validate_block_finality can return error when 
-        - chain id is invalid
-        - calculate_block_finality returns error if chain id is invalid
-        - exception BlockFinalityTimeExceededError on validate_block_finality
-    """
-    app = consume_event_task
-    # mock define_chain_for_block_finality
-    result_chain_block_finality = DefineChainBlockFinalityResult()
-    result_chain_block_finality.err = "Invalid chain ID"
-    app.define_chain_for_block_finality = MagicMock(
-        return_value=result_chain_block_finality
-    )
-    # 1st event
-    event_dto.name = events[0]
-    event_bytes = to_bytes(event_dto)
-
-    if len(events) > 1:
-        # 2nd event
-        app._callback(event=event_bytes)
-        event_dto.name = events[1]
-        event_bytes = to_bytes(event_dto)
-    
-    # Act
-    result = app._callback(event=event_bytes)
-    
-    # Assert
-    app.define_chain_for_block_finality.assert_called()
-    assert "Invalid chain ID" in result.err
-
-
 def test_call_consume_event_task_and_read_events(
     consume_event_task,
     register_provider,
-    event_dto
+    event_dto,
+    get_blockchain_config
 ):
     """
         Test __call__ that function calls.
@@ -660,17 +410,231 @@ def test_call_consume_event_task_and_read_events(
     app.execute_smart_contract_function = MagicMock(side_effect=app.execute_smart_contract_function)
 
     # Act
-    app()
+    with patch(
+        'src.relayer.application.consume_event_task.get_blockchain_config',
+        return_value=get_blockchain_config
+    ):
+        app()
 
-    # handle events
-    assert app._callback.call_count == 7
-    assert app._convert_data_from_bytes.call_count == 7
-    # Validate block finality
-    assert app.manage_validate_block_finality.call_count == 2
-    assert app.store_operation_hash.call_count == 2
-    assert app.define_chain_for_block_finality.call_count == 2
-    assert app.define_block_step_for_block_finality.call_count == 2
-    assert app.calculate_block_finality.call_count == 2
-    assert app.validate_block_finality.call_count == 2
-    # Execute smart contract function
-    assert app.execute_smart_contract_function.call_count == 5
+        # handle events
+        assert app._callback.call_count == 7
+        assert app._convert_data_from_bytes.call_count == 7
+        # Validate block finality
+        assert app.manage_validate_block_finality.call_count == 2
+        # assert app.store_operation_hash.call_count == 2
+        
+        assert app.calculate_block_finality.call_count == 2
+        assert app.validate_block_finality.call_count == 2
+        # # Execute smart contract function
+        assert app.execute_smart_contract_function.call_count == 5
+
+def test_manage_event_with_rules_return_none_with_invalid_event_name(
+    consume_event_task, 
+    event_dto,
+):
+    """
+        Test manage_event_with_rules that returns None with an invalid event
+    """
+    app = consume_event_task
+    app.manage_validate_block_finality = MagicMock()
+    app.execute_smart_contract_function = MagicMock()
+    event_dto.name = "invalid_event_name"
+    
+    assert app.manage_event_with_rules_v2(event=event_dto) is None
+
+@pytest.mark.parametrize('event_data, expected', [
+    ({"event": "OperationCreated", "chainIdFrom": 123, "chainIdTo": 789, "blockStep": 555}, 123),
+    ({"event": "FeesDeposited", "chainIdFrom": 123, "chainIdTo": 789, "blockStep": 777}, 789),
+    ({"event": "FeesDepositConfirmed", "chainIdFrom": 123, "chainIdTo": 789, "blockStep": 779}, None),
+    ({"event": "FeesLockedConfirmed", "chainIdFrom": 123, "chainIdTo": 789, "blockStep": 558}, None),
+    ({"event": "FeesLockedAndDepositConfirmed", "chainIdFrom": 123, "chainIdTo": 789, "blockStep": 559}, None),
+    ({"event": "OperationFinalized", "chainIdFrom": 123, "chainIdTo": 789, "blockStep": 781}, None),
+])
+def test_manage_event_with_rules_call_manage_block_finality_success(
+    consume_event_task, 
+    event_dto, 
+    event_data, 
+    expected
+):
+    """
+        Test manage_event_with_rules that execute manage_validate_block_finality
+        according to the rule with has_block_finality = True
+        See: src.relayer.config.config.get_relayer_event_rule()
+    """
+    app = consume_event_task
+    app.manage_validate_block_finality = MagicMock()
+    app.execute_smart_contract_function = MagicMock()
+    event_dto.name = event_data['event']
+    event_dto.data['params']['chainIdFrom'] = event_data['chainIdFrom']
+    event_dto.data['params']['chainIdTo'] = event_data['chainIdTo']
+    event_dto.data['blockStep'] = event_data['blockStep']
+    # act
+    app.manage_event_with_rules_v2(event=event_dto)
+    # assert
+    if expected is not None:
+        app.manage_validate_block_finality.assert_called_with(
+            chain_id=expected,
+            block_step=event_data['blockStep']
+        )
+    else:
+        app.manage_validate_block_finality.assert_not_called()
+
+
+@pytest.mark.parametrize('event_data, expected', [
+    ({"event": "OperationCreated", "chainIdFrom": 123, "chainIdTo": 789, "blockStep": 555}, (None, None)),
+    ({"event": "FeesDeposited", "chainIdFrom": 123, "chainIdTo": 789, "blockStep": 777}, ("sendFeesLockConfirmation", 789)),
+    ({"event": "FeesDepositConfirmed", "chainIdFrom": 123, "chainIdTo": 789, "blockStep": 779}, ("receiveFeesLockConfirmation", 123)),
+    ({"event": "FeesLockedConfirmed", "chainIdFrom": 123, "chainIdTo": 789, "blockStep": 558}, ("confirmFeesLockedAndDepositConfirmed", 123)),
+    ({"event": "FeesLockedAndDepositConfirmed", "chainIdFrom": 123, "chainIdTo": 789, "blockStep": 559}, ("completeOperation", 789)),
+    ({"event": "OperationFinalized", "chainIdFrom": 123, "chainIdTo": 789, "blockStep": 781}, ("receivedFinalizedOperation", 789)),
+])
+def test_manage_event_with_rules_call_execute_smart_contract_function_success(
+    consume_event_task, 
+    event_dto, 
+    event_data, 
+    expected
+):
+    """
+        Test manage_event_with_rules that execute execute_smart_contract_function
+        according to the rule with func_name and chain_func_name set.
+        See: src.relayer.config.config.get_event_rules()
+    """
+    app = consume_event_task
+    block_finality_result = BlockFinalityResult()
+    block_finality_result.ok = "ok"
+    app.manage_validate_block_finality = MagicMock(return_value=block_finality_result)
+    app.execute_smart_contract_function = MagicMock()
+    event_dto.name = event_data['event']
+    event_dto.data['params']['chainIdFrom'] = event_data['chainIdFrom']
+    event_dto.data['params']['chainIdTo'] = event_data['chainIdTo']
+    event_dto.data['blockStep'] = event_data['blockStep']
+
+    app.manage_event_with_rules_v2(event=event_dto)
+    
+    if expected[0] is not None:
+        app.execute_smart_contract_function.assert_called_with(
+            chain_id=expected[1],
+            func_name=expected[0],
+            params={
+                "operationHash": event_dto.data['operationHash'],
+                "params": event_dto.data['params'],
+                "blockStep": event_dto.data['blockStep'],                
+            }
+        )
+    else:
+        app.execute_smart_contract_function.assert_not_called()
+
+
+
+
+def test_callback_returns_none_with_invalid_event(consume_event_task):
+    """Test _callback is returning None with a bad event."""
+    app = consume_event_task
+    app._convert_data_from_bytes = MagicMock(side_effect=app._convert_data_from_bytes)
+
+    event_bytes = to_bytes({"k": "v"})
+    result = app._callback(event=event_bytes)
+
+    assert result is None
+    app._convert_data_from_bytes.assert_called()
+    app._convert_data_from_bytes.assert_called_with(event=event_bytes)
+
+# @pytest.mark.parametrize('event', [
+#     'OperationCreated',
+#     'FeesLockedConfirmed',
+# ])
+# def test_callback_with_event_OpeartionCreated_only_store_operation_hash(
+#     consume_event_task,
+#     event_dto,
+#     event
+# ):
+#     """
+#         Test _callback stores operation hash if it does not already exist.
+#         The process is then stopped.
+
+#         Event working together
+#             - OpeartionCreated
+#             - FeesLockedConfirmed
+#     """
+#     event_dto.name = event
+#     operation_hash = event_dto.data['operationHash']
+#     chain_id = event_dto.data['params']['chainIdFrom']
+#     block_step = event_dto.data['blockStep']
+
+#     app = consume_event_task
+#     event_bytes = to_bytes(event_dto)
+#     app._callback(event=event_bytes)
+
+#     expected = {
+#         'chain_id': chain_id,
+#         'block_step': block_step
+#     }
+#     assert app.operation_hash_events[operation_hash] == expected
+
+# @pytest.mark.parametrize('events', [
+#     ('OperationCreated', 'FeesLockedConfirmed'),
+#     ('FeesLockedConfirmed', 'OperationCreated'),
+# ])
+# def test_callback_with_event_OpeartionCreated_and_FeesLockedConfirmed(
+#     consume_event_task,
+#     event_dto,
+#     events,
+# ):
+#     """
+#         Test _callback that return success with both event
+#         - OperationCreated
+#         - FeesLockedConfirmed
+        
+#         Not matter which event comes in with the same operation hash.
+#         1st event, operation hash, chain id and block_step are stored
+#         2nd event with the same operation hash, the process is trigger with
+#             - block finality validation
+#             - execute smart contract task
+#     """
+#     app = consume_event_task
+#     # 1st event
+#     event_dto.name = events[0]
+#     event_bytes = to_bytes(event_dto)
+#     app._callback(event=event_bytes)
+
+#     # 2nd event
+#     event_dto.name = events[1]
+#     event_bytes = to_bytes(event_dto)
+    
+#     with patch(
+#         f"{PATH}.ConsumeEventTask.manage_validate_block_finality"
+#     ) as mock_block_validation:
+#         result = BlockFinalityResult()
+#         result.ok = "Success"
+#         mock_block_validation.return_value = result
+
+#         with patch(f"{PATH}.ExecuteContractTask.__call__") as mock_execute:
+#             result = app._callback(event=event_bytes)
+#             mock_execute.assert_called()
+#         mock_block_validation.assert_called()
+
+
+def test_callback_manage_validate_block_finality_returns_err(
+    consume_event_task,
+    event_dto,
+):
+    """
+        Test _callback that returns result.err if manage_validate_block_finality
+        returns error.
+    """
+    app = consume_event_task
+    # mock manage_validate_block_finality
+    block_finality_result = BlockFinalityResult()
+    block_finality_result.err = "fake block_finality_result"
+    app.manage_validate_block_finality = MagicMock(
+        return_value=block_finality_result
+    )
+
+    event_dto.name = 'OperationCreated'
+    event_bytes = to_bytes(event_dto)    
+    result = app._callback(event=event_bytes)
+    
+    # Assert
+    app.manage_validate_block_finality.assert_called()
+    assert "fake block_finality_result" in result.err
+

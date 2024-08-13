@@ -63,6 +63,7 @@ class EventDTO:
 
     name: str
     data: Any
+    block_key: str
 
     @staticmethod
     def data_as_dict(attr_dict: Any) -> Dict[str, Any]:

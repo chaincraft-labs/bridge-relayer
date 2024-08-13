@@ -5,6 +5,17 @@ from src.relayer.domain.exception import (
     BridgeRelayerRegisterEventFailed
 )
 from src.relayer.interface.relayer import IRelayerRegister
+from src.relayer.domain.config import RelayerRegisterConfigDTO
+
+
+def register_config():
+    return RelayerRegisterConfigDTO(
+        host="localhost",
+        port=5672,
+        user="guest",
+        password="guest",
+        queue_name="bridge.relayer.dev",
+    )
 
 
 class MockRelayerRegisterEvent(IRelayerRegister):

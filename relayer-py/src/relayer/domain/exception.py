@@ -37,6 +37,9 @@ class BridgeRelayerConfigReplacePlaceholderTypeError(BridgeRelayerException):
     """Raise when bad args provided to replace placeholder."""
 
 
+class BridgeRelayerConfigEventRuleKeyError(BridgeRelayerException):
+    """Raise when invalid event name provided."""
+
 
 # Blockchain events
 class BridgeRelayerEventDataMissing(BridgeRelayerException):
@@ -53,6 +56,22 @@ class BridgeRelayerListenEventFailed(BridgeRelayerException):
 
 class BridgeRelayerEventsFilterTypeError(BridgeRelayerException):
     """Raise when events filter is invalid type."""
+
+
+class BridgeRelayerEventsNotFound(BridgeRelayerException):
+    """Raise when events not founds in ABI."""
+
+
+class BridgeRelayerInvalidStartBlock(BridgeRelayerException):
+    """Raise when start block is greater than end block."""
+
+
+class BridgeRelayerErrorBlockPending(BridgeRelayerException):
+    """Raise when a block is in pending status."""
+
+
+class BridgeRelayerFetchEventOutOfRetries(BridgeRelayerException):
+    """Raise when max retries has been reach while fetchin event data from RPC."""
 
 
 # Register events
@@ -89,3 +108,10 @@ class EventConverterTypeError(BridgeRelayerException):
 # Event Consumer
 class BlockFinalityTimeExceededError(BridgeRelayerException):
     """Raise when The function has exceeded the allocated time for processing."""
+
+
+#  Event data stored
+
+class EventDataStoreRegisterFailed(BridgeRelayerException):
+    """Raise when the event cannot be set as registered in the state."""
+    

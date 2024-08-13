@@ -11,6 +11,8 @@ from pika.adapters.blocking_connection import BlockingChannel
 from pika.exceptions import AMQPConnectionError
 import pytest
 
+from src.relayer.config.config import get_register_config
+
 from src.relayer.domain.exception import (
     BridgeRelayerReadEventFailed,
     BridgeRelayerRegisterChannelError,
@@ -24,7 +26,7 @@ from src.relayer.domain.config import RelayerRegisterConfigDTO
 from src.relayer.provider.relayer_register_pika import (
     RelayerRegisterEvent,
 )
-from utils.converter import to_bytes
+from src.utils.converter import to_bytes
 from tests.conftest import DATA_TEST
 
 # -------------------------------------------------------
@@ -37,33 +39,51 @@ def disable_logging():
     yield
     # Réactiver les logs après les tests
     logging.disable(logging.NOTSET)
-    
+
 @pytest.fixture(scope="function")
-def provider():
-    provider = RelayerRegisterEvent()
-    return provider
+def register_config():
+    return RelayerRegisterConfigDTO(
+        host="localhost",
+        port=5672,
+        user="guest",
+        password="guest",
+        queue_name="bridge.relayer.dev",
+    )
+
+@pytest.fixture(scope="function")
+def provider(register_config):
+    with patch(
+        'src.relayer.provider.relayer_register_pika.get_register_config', 
+        return_value=register_config
+    ):
+        provider = RelayerRegisterEvent()
+        return provider
 
 @pytest.fixture(scope="function")
 def event_dto():
     event = DATA_TEST.EVENT_SAMPLE.copy()
+    block_key = f"{event.blockNumber}-{event.transactionHash.hex()}-{event.logIndex}"
     return EventDTO(
         name=event.event, # type: ignore
-        data=event.args , # type: ignore
+        data=event.args,  # type: ignore
+        block_key=block_key
     )
 
 # -----------------------------------------------------------------
 # T E S T S
 # -----------------------------------------------------------------
-def test_relayer_register_event_init():
+def test_relayer_register_event_init(register_config):
     """
         Test RelayerRegisterEvent init
     """
-    RelayerRegisterEvent._set_logging = MagicMock()
-    provider = RelayerRegisterEvent()
-
-    assert isinstance(
-        provider.relayer_register_config, RelayerRegisterConfigDTO)
-    assert provider.queue_name == "bridge.relayer.dev"
+    with patch(
+        'src.relayer.provider.relayer_register_pika.get_register_config', 
+        return_value=register_config
+    ):
+        provider = RelayerRegisterEvent()
+        assert isinstance(
+            provider.relayer_register_config, RelayerRegisterConfigDTO)
+        assert provider.queue_name == "bridge.relayer.dev"
 
 def test_register_event_fail_with_exception(provider, event_dto):
     """
@@ -304,7 +324,7 @@ def test_send_message_with_success(provider):
         routing_key="a.fake.queue",
         message='a fake message',
     )
-    
+
 def test_send_message_success(provider):
     """
         Test _send_message that send a message to RabbitMQ and succeed

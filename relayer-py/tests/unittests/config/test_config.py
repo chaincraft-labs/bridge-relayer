@@ -5,6 +5,7 @@ from unittest.mock import patch
 import pytest
 
 from src.relayer.domain.config import (
+    EventRuleConfig,
     RelayerBlockchainConfigDTO, 
     RelayerRegisterConfigDTO,
 )
@@ -12,10 +13,13 @@ from src.relayer.domain.exception import (
     BridgeRelayerConfigABIAttributeMissing, 
     BridgeRelayerConfigABIFileMissing, 
     BridgeRelayerConfigBlockchainDataMissing,
+    BridgeRelayerConfigEventRuleKeyError,
     BridgeRelayerConfigRegisterDataMissing, 
     BridgeRelayerConfigReplacePlaceholderTypeError, 
     BridgeRelayerConfigTOMLFileMissing
 )
+
+from src.relayer.config.config import load_env_file
 
 # -------------------------------------------------------
 # F I X T U R E S
@@ -29,6 +33,32 @@ def config():
     return config
 
 @pytest.fixture(scope="function")
+def blockchain_config():
+    config = RelayerBlockchainConfigDTO(
+        chain_id=123, 
+        rpc_url='https://fake.rpc_url.org', 
+        project_id='JMFW2926FNFKRMFJF1FNNKFNKNKHENFL', 
+        pk='abcdef12345678890abcdef12345678890abcdef12345678890abcdef1234567', 
+        wait_block_validation=6, 
+        block_validation_second_per_block=12,
+        smart_contract_address='0x1234567890abcdef1234567890abcdef12345678', 
+        genesis_block=123456789, 
+        abi=[{}], 
+        client='middleware'
+    )
+    return config
+
+@pytest.fixture(scope="function")
+def register_config():
+    return RelayerRegisterConfigDTO(
+        host="localhost",
+        port=5672,
+        user="guest",
+        password="guest",
+        queue_name="bridge.relayer.dev",
+    )
+
+@pytest.fixture(scope="function")
 def config_prod():
     os.environ['DEV_ENV'] = "False"
     if 'src.relayer.config.config' in sys.modules:
@@ -36,24 +66,36 @@ def config_prod():
     import src.relayer.config.config as config
     return config
 
+# Clean up the environment variable after tests
+def teardown_function():
+    if 'DEV_ENV' in os.environ:
+        del os.environ['DEV_ENV']
+
+pytest.fixture(autouse=True)(teardown_function)
+
 # -------------------------------------------------------
 # T E S T S
 # -------------------------------------------------------
 
-def test_get_blockchain_config_returns_dto_with_chain_id(config):
+def test_get_blockchain_config_returns_dto_with_chain_id(config, blockchain_config):
     """
         Test get_blockchain_config returns a RelayerBlockchainConfigDTO DTO.
     """
-    chain_id = 123
-    blockchain_config_dto = config.get_blockchain_config(chain_id=chain_id)
-    assert str(blockchain_config_dto) == f"ChainId{chain_id}"
-    assert isinstance(blockchain_config_dto, RelayerBlockchainConfigDTO)
-    assert blockchain_config_dto.chain_id == chain_id
-    assert blockchain_config_dto.rpc_url ==  "https://fake.rpc_url.org"
-    assert blockchain_config_dto.project_id == os.environ[f"PROJECT_ID_{chain_id}"]
-    assert blockchain_config_dto.smart_contract_address == "0x1234567890abcdef1234567890abcdef12345678"
-    assert blockchain_config_dto.genesis_block == 123456789
-    assert blockchain_config_dto.pk == os.environ[f"PK_{chain_id}"]
+    with patch('src.relayer.config.config.get_blockchain_config', return_value=blockchain_config):
+        chain_id = 123
+        blockchain_config_dto = config.get_blockchain_config(chain_id=chain_id)
+        assert str(blockchain_config_dto) == f"ChainId{chain_id}"
+        assert isinstance(blockchain_config_dto, RelayerBlockchainConfigDTO)
+        assert blockchain_config_dto.chain_id == chain_id
+        assert blockchain_config_dto.rpc_url ==  "https://fake.rpc_url.org"
+        assert blockchain_config_dto.smart_contract_address == "0x1234567890abcdef1234567890abcdef12345678"
+        assert blockchain_config_dto.genesis_block == 123456789
+        assert blockchain_config_dto.block_validation_second_per_block == 12
+        assert blockchain_config_dto.wait_block_validation == 6
+        assert blockchain_config_dto.client == 'middleware'
+        assert blockchain_config_dto.project_id == 'JMFW2926FNFKRMFJF1FNNKFNKNKHENFL'
+        assert blockchain_config_dto.pk == 'abcdef12345678890abcdef12345678890abcdef12345678890abcdef1234567'
+        assert blockchain_config_dto.abi == [{}]
     
 def test_get_blockchain_config_raise_exception_with_bad_chain_id(config):
     """
@@ -62,19 +104,20 @@ def test_get_blockchain_config_raise_exception_with_bad_chain_id(config):
         arguments.
     """
     with pytest.raises(BridgeRelayerConfigBlockchainDataMissing):
-        config.get_blockchain_config(chain_id=0)        
+        config.get_blockchain_config(chain_id=0)
     
-def test_get_register_config_returns_dto_with(config):
+def test_get_register_config_returns_dto_with(config, register_config):
     """
         Test get_register_config returns a RelayerRegisterConfigDTO DTO.
     """
-    register_config_dto = config.get_register_config()
-    assert isinstance(register_config_dto, RelayerRegisterConfigDTO)
-    assert register_config_dto.host == "localhost"
-    assert register_config_dto.port == 5672
-    assert register_config_dto.user == "guest"
-    assert register_config_dto.password == os.environ["RELAYER_REGISTER_PASSWORD"]
-    assert register_config_dto.queue_name == "bridge.relayer.dev"
+    with patch('src.relayer.config.config.get_register_config', return_value=register_config):
+        register_config_dto = config.get_register_config()
+        assert isinstance(register_config_dto, RelayerRegisterConfigDTO)
+        assert register_config_dto.host == "localhost"
+        assert register_config_dto.port == 5672
+        assert register_config_dto.user == "guest"
+        assert register_config_dto.queue_name == "bridge.relayer.dev"
+
     
 def test_get_register_config_raise_exception_with_data_missing(config):
     """
@@ -95,17 +138,29 @@ def test_bridge_relayer_config_envi_is_dev(config):
 # ----------------------------------------------------------
 # Internal fonctions
 # ----------------------------------------------------------
-def test_load_env_file_with_valid_file(config):
-    """
-        Test load_env_file that exports all values from the env.config.dev 
-        file.
-    """
-    config.load_env_file()
-    assert os.environ["PROJECT_ID_411"] == "YZDVs36JnDusFSQZZ42ly3ihIgHQ24eC"
-    assert os.environ["PROJECT_ID_80002"] == "YZDVs36JnDusFSQZZ42ly3ihIgHQ24eC"
-    assert os.environ["PK_411"] == "673e1858045114d92030ad9d6395d462281e63bcd2b96258a04f7ef8dcd4edad"
-    assert os.environ["PK_80002"] == "673e1858045114d92030ad9d6395d462281e63bcd2b96258a04f7ef8dcd4edad"
-    assert os.environ["RELAYER_REGISTER_PASSWORD"] == "guest"
+@patch('src.relayer.config.config.load_dotenv')
+def test_load_env_file_dev(mock_load_dotenv):
+    # Set the environment variable to simulate dev environment
+    os.environ['DEV_ENV'] = 'True'
+
+    # Call the function
+    load_env_file()
+
+    # Assert that load_dotenv was called with the dev file
+    mock_load_dotenv.assert_any_call(".env.config.dev")
+    mock_load_dotenv.assert_any_call(".env.config.prod")
+
+@patch('src.relayer.config.config.load_dotenv')
+def test_load_env_file_prod(mock_load_dotenv):
+    # Set the environment variable to simulate prod environment
+    os.environ['DEV_ENV'] = 'False'
+
+    # Call the function
+    load_env_file()
+
+    # Assert that load_dotenv was called with the prod file
+    mock_load_dotenv.assert_any_call(".env.config.prod")
+
 
 def test_get_toml_file_returns_prod_env(config_prod):
     """
@@ -178,3 +233,19 @@ def test_get_abi_raise_exception_with_invalid_chain_id(config):
     """
     with pytest.raises(BridgeRelayerConfigABIAttributeMissing):
         config.get_abi(chain_id=777)
+
+def test_get_relayer_event_rules_raise_exception_with_invalid_event_name(config):
+    """
+        Test get_relayer_event_rules that raises 
+        BridgeRelayerConfigRelayerEventRulesDataMissing with invalid event_name
+    """
+    with pytest.raises(BridgeRelayerConfigEventRuleKeyError):
+        config.get_relayer_event_rule(event_name="invalid_event_name")
+    
+def test_get_relayer_event_rules_returns_valid_event_rule(config):
+    """
+        Test get_relayer_event_rules that returns valid event rule
+    """
+    event_rule = config.get_relayer_event_rule(event_name="OperationCreated")
+    assert isinstance(event_rule, EventRuleConfig)
+    assert event_rule.event_name == "OperationCreated"

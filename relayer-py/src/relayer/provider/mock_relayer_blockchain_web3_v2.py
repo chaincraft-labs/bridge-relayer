@@ -5,13 +5,14 @@ import secrets
 from typing import Any, Callable, List
 
 
+from src.relayer.domain.event import EventDatasDTO
 from src.relayer.domain.exception import BridgeRelayerListenEventFailed
 from src.relayer.domain.relayer import (
     BridgeTaskDTO,
     BridgeTaskResult,
     BridgeTaskTxResult
 )
-from src.relayer.interface.relayer import IRelayerBlockchain
+from src.relayer.interface.relayer_blockchain_scanner import IRelayerBlockchain
 from src.relayer.domain.config import (
     RelayerBlockchainConfigDTO,
 )
@@ -23,6 +24,7 @@ def get_blockchain_config(chain_id):
         project_id='JMFW2926FNFKRMFJF1FNNKFNKNKHENFL', 
         pk='abcdef12345678890abcdef12345678890abcdef12345678890abcdef1234567', 
         wait_block_validation=6, 
+        block_validation_second_per_block=0,
         smart_contract_address='0x1234567890abcdef1234567890abcdef12345678', 
         genesis_block=123456789, 
         abi=[{}], 
@@ -58,7 +60,6 @@ class MockRelayerBlockchainProvider(IRelayerBlockchain):
         self.event_filter = events
 
     def listen_events(self, callback: Callable[..., Any], poll_interval: int) -> Any:
-        print("calllll")
         try:
             if self.exception:
                 raise self.exception
@@ -92,4 +93,21 @@ class MockRelayerBlockchainProvider(IRelayerBlockchain):
             result.err = e
 
         return result
+
+    def connect_client(self, chain_id: int):
+        pass
+
+    def get_suggested_scan_end_block(self):
+        return 15123
+
+    def scan(self, start_block: int, end_block: int) -> EventDatasDTO:
+        pass
+
+    async def client_version(self) -> str:
+        pass
+
+    def get_account_address(self) -> str:
+        pass
+
+
 

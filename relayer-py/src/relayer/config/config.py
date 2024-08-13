@@ -8,13 +8,15 @@ import tomli
 from jinja2 import Template
 
 from src.relayer.domain.config import (
+    EventRuleConfig,
     RelayerBlockchainConfigDTO, 
     RelayerRegisterConfigDTO,
 )
 from src.relayer.domain.exception import (
     BridgeRelayerConfigABIAttributeMissing, 
     BridgeRelayerConfigABIFileMissing, 
-    BridgeRelayerConfigBlockchainDataMissing, 
+    BridgeRelayerConfigBlockchainDataMissing,
+    BridgeRelayerConfigEventRuleKeyError, 
     BridgeRelayerConfigRegisterDataMissing, 
     BridgeRelayerConfigReplacePlaceholderTypeError, 
     BridgeRelayerConfigTOMLFileMissing,
@@ -31,7 +33,6 @@ FILE_ENV_PRD = ".env.config.prod"
 
 # Load .env
 load_dotenv()
-
 
 def is_dev_env() -> bool:
     """Check if environment is dev or prod.
@@ -182,7 +183,7 @@ def get_blockchain_config(chain_id: int) -> RelayerBlockchainConfigDTO:
         raise BridgeRelayerConfigBlockchainDataMissing(
             f"chain_id={chain_id} Error={e} _bridge_relayer_config={_bridge_relayer_config}"
         )
-    
+
 
 def get_register_config() -> RelayerRegisterConfigDTO:
     """Get the bridge relayer event register config.
@@ -199,4 +200,28 @@ def get_register_config() -> RelayerRegisterConfigDTO:
         return RelayerRegisterConfigDTO(**_bridge_relayer_config['relayer_register'])
     except TypeError as e:
         raise BridgeRelayerConfigRegisterDataMissing(e)
+
+
+def get_relayer_event_rule(event_name: str) -> EventRuleConfig:
+    """Get the bridge relayer event rule config.
+
+    Args:
+        event_name (str): The event name
+
+    Returns:
+        EventRuleConfig: The bridge relayer event rule config DTO
+    """
+    _bridge_relayer_config: Dict[str, Any] = _get_bridge_relayer_config()
+    data: Dict[str, Any] = {}
     
+    for k, v in _bridge_relayer_config['relayer_event_rules'].items():
+        if event_name.lower() != k.lower():
+            continue
+        
+        data.update(v)
+        data.update({"event_name": event_name})
+    
+    try:
+        return EventRuleConfig(**data)
+    except TypeError as e:
+        raise BridgeRelayerConfigEventRuleKeyError(e)

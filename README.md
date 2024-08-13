@@ -144,7 +144,7 @@ poetry run python bin/task_listener.py --watch
 ```bash
 
 # Start a geth node
-geth geth --datadir . --dev --http --dev.period 12
+geth --datadir . --dev --http --dev.period 12
 
 # Deploy 
 geth HARDHAT_NETWORK=allfeat_local node scripts/as_bridge.js --deploy gethAllfeatLocal
@@ -185,3 +185,34 @@ geth HARDHAT_NETWORK=geth node scripts/as_bridge.js --update-operator
 ### Front app
 
 https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fharmonie-endpoint-02.allfeat.io#/settings
+
+
+## Event magement
+
+| Chain<br>Event | Event                         | Block<br>Finality| Chain<br>Exec | Exec Func                            | Condition        |
+|----------------|-------------------------------|------------------|---------------|--------------------------------------|------------------|
+| from           | OperationCreated              | Yes              | NA            | NA                                   | NA               |
+| to             | FeesDeposited                 | Yes              | to            | SendFeesLockConfirmation             | NA               |
+| to             | FeesDepositConfirmed          | No               | from          | ReceiveFeesLockConfirmation          | NA               |
+| from           | FeesLockedConfirmed           | No               | from          | confirmFeesLockedAndDepositConfirmed | OperationCreated |
+| from           | FeesLockedAndDepositConfirmed | No               | to            | completeOperation                    | NA               |
+| to             | OperationFinalized            | No               | NA            | NA                                   | NA               |
+
+
+
+### Rename function and event
+
+| Event                         | New event name                                      | Function name                        | New function name                               | chain |
+|-------------------------------|-----------------------------------------------------|--------------------------------------|-------------------------------------------------|-------|
+|                               |                                                     | createBridgeOperation                | depositTokensOnOriginChain                      | from  |
+| OperationCreated              | TokenDepositedOnOrigineChain                        |                                      |                                                 |       |
+|                               |                                                     | depositFees                          | depositTokensForFeesOnDestinationChain          | to    |
+| FeesDeposited                 | TokensDepositedForFeesOnDestinationChain            | SendFeesLockConfirmation             | confirmFeeTokensDepositOnDestinationChainB      | to    |
+| FeesDepositConfirmed          | FeeTokensDepositedOnDestinationChainConfirmedB      | ReceiveFeesLockConfirmation          | confirmFeeTokensDepositOnDestinationChainA      | from  |
+| FeesLockedConfirmed           | FeeTokensDepositedOnDestinationChainConfirmedA      | confirmFeesLockedAndDepositConfirmed | confirmTokensDepositOnBothChain                 | from  |
+| FeesLockedAndDepositConfirmed | TokensDepositedOnBothChainConfirmed                 | completeOperation                    | completeBridgeOperation                         | to    |
+| OperationFinalized            | BridgeOperationCompleted                            | receivedFinalizedOperation           | confirmBridgeOperationCompleted                 | to    |
+
+> Note
+> - `A` -> channel A (origin/from)
+> - `B` -> channel B (destination/to)

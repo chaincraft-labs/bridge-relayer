@@ -8,7 +8,9 @@ mode = "dev"
     project_id = "{{ PROJECT_ID_440 }}"
     pk = "{{ PK_440 }}"
     wait_block_validation = 6
-    smart_contract_address = "0xa92D0afeB8077893b16769B1BBf011509731bA49"
+    # block_validation_second_per_block = 6
+    block_validation_second_per_block = 1
+    smart_contract_address = "0xbdEBa100F235E1035A7D7B2E78aB340C207B390F"
     genesis_block = 0
     client = ""
 
@@ -18,17 +20,9 @@ mode = "dev"
     project_id = "{{ PROJECT_ID_1337 }}"
     pk = "{{ PK_1337 }}"
     wait_block_validation = 6
-    smart_contract_address = "0x8613A4029EaA95dA61AE65380aC2e7366451bF2b"
-    genesis_block = 0
-    client = "middleware"
-
-    # Anvil local node
-    [relayer_blockchain.ChainId31337]
-    rpc_url = "http://127.0.0.1:8545/"
-    project_id = "{{ PROJECT_ID_31337 }}"
-    pk = "{{ PK_31337 }}"
-    wait_block_validation = 1
-    smart_contract_address = "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+    # block_validation_second_per_block = 12
+    block_validation_second_per_block = 1
+    smart_contract_address = "0xEC57dE8D74bdf9F19908f12Cef32D0dE639d9e7a"
     genesis_block = 0
     client = "middleware"
 
@@ -37,46 +31,38 @@ mode = "dev"
     project_id = "{{ PROJECT_ID_80002 }}"
     pk = "{{ PK_80002 }}"
     wait_block_validation = 6
+    block_validation_second_per_block = 12
     smart_contract_address = "0x6dC7CfE7Ce3c4d071fABC7B616E94fBba361B212"
     genesis_block = 8267279
     client = "middleware"
-
-    [relayer_blockchain.ChainId441]
-    rpc_url = "https://harmonie-endpoint-02.allfeat.io/"
-    project_id = "{{ PROJECT_ID_441 }}"
-    pk = "{{ PK_441 }}"
-    wait_block_validation = 6
-    smart_contract_address = "0x55e05213724f97c5C1ee976B5a219a7eB54EE1F1"
-    genesis_block = 1015519
-    client = ""
 
     [relayer_blockchain.ChainId123]
     rpc_url = "https://fake.rpc_url.org"
     project_id = "{{ PROJECT_ID_123 }}"
     pk = "{{ PK_123 }}"
     wait_block_validation = 6
+    block_validation_second_per_block = 12
     smart_contract_address = "0x1234567890abcdef1234567890abcdef12345678"
-    genesis_block = 123456789
+    genesis_block = 666
     client = "middleware"
 
+    # [relayer_blockchain.ChainId456]
+    # rpc_url = "https://fake.rpc_url.org"
+    # project_id = "{{ PROJECT_ID_456 }}"
+    # pk = "{{ PK_456 }}"
+    # wait_block_validation = 1
+    # smart_contract_address = "0x1234567890abcdef1234567890abcdef12345678"
+    # genesis_block = 123456789
+    # client = "middleware"
 
-    [relayer_blockchain.ChainId456]
-    rpc_url = "https://fake.rpc_url.org"
-    project_id = "{{ PROJECT_ID_456 }}"
-    pk = "{{ PK_456 }}"
-    wait_block_validation = 1
-    smart_contract_address = "0x1234567890abcdef1234567890abcdef12345678"
-    genesis_block = 123456789
-    client = "middleware"
-
-    [relayer_blockchain.ChainId789]
-    rpc_url = "https://fake.rpc_url.org"
-    project_id = "{{ PROJECT_ID_789 }}"
-    pk = "{{ PK_789 }}"
-    wait_block_validation = 1
-    smart_contract_address = "0x1234567890abcdef1234567890abcdef12345678"
-    genesis_block = 123456789
-    client = "middleware"
+    # [relayer_blockchain.ChainId789]
+    # rpc_url = "https://fake.rpc_url.org"
+    # project_id = "{{ PROJECT_ID_789 }}"
+    # pk = "{{ PK_789 }}"
+    # wait_block_validation = 1
+    # smart_contract_address = "0x1234567890abcdef1234567890abcdef12345678"
+    # genesis_block = 123456789
+    # client = "middleware"
 
 [relayer_register]
 # RabbitMQ Broker
@@ -85,3 +71,45 @@ port = "{{ RELAYER_REGISTER_PORT }}"
 user = "{{ RELAYER_REGISTER_USER }}"
 password = "{{ RELAYER_REGISTER_PASSWORD }}"
 queue_name = "{{ RELAYER_REGISTER_QUEUE_NAME }}"
+
+[relayer_event_rules]
+    # event_name: str
+    # origin: str
+    # has_block_finality: bool
+    # chain_func_name: Optional[str] = None
+    # func_name: Optional[str] = None
+    # func_condition: Optional[str] = None
+
+    [relayer_event_rules.OperationCreated]
+    origin = "chainIdFrom"
+    has_block_finality = true
+
+    [relayer_event_rules.FeesDeposited]
+    origin = "chainIdTo"
+    has_block_finality = true
+    chain_func_name = 'chainIdTo'
+    func_name = "sendFeesLockConfirmation"
+
+    [relayer_event_rules.FeesDepositConfirmed]
+    origin = "chainIdTo"
+    has_block_finality = false
+    chain_func_name = 'chainIdFrom'
+    func_name = "receiveFeesLockConfirmation"
+
+    [relayer_event_rules.FeesLockedConfirmed]
+    origin = "chainIdFrom"
+    has_block_finality = false
+    chain_func_name = 'chainIdFrom'
+    func_name = "confirmFeesLockedAndDepositConfirmed"
+
+    [relayer_event_rules.FeesLockedAndDepositConfirmed]
+    origin = "chainIdFrom"
+    has_block_finality = false
+    chain_func_name = 'chainIdTo'
+    func_name = "completeOperation"
+
+    [relayer_event_rules.OperationFinalized]
+    origin = "chainIdTo"
+    has_block_finality = false
+    chain_func_name = 'chainIdTo'
+    func_name = "receivedFinalizedOperation"

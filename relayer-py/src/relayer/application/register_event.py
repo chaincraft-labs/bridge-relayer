@@ -32,7 +32,7 @@ class RegisterEvent(BaseApp):
         """
         result = RegisterEventResult()
 
-        self.print_log("info", f"Registering event : {event}")
+        # self.print_log("info", f"Registering event : {event}")
         
         try:
             self.rr_provider.register_event(event=event)

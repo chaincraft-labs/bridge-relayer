@@ -1,6 +1,6 @@
 """Entities for Relayer Config."""
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
 
 @dataclass
@@ -12,6 +12,7 @@ class RelayerBlockchainConfigDTO:
     project_id: str
     pk: str
     wait_block_validation: int
+    block_validation_second_per_block: int
     smart_contract_address: str
     genesis_block: int
     abi: Any
@@ -28,4 +29,16 @@ class RelayerRegisterConfigDTO:
     port: int
     user: str
     password: str
-    queue_name: str    
+    queue_name: str
+
+
+@dataclass
+class EventRuleConfig:
+    """Event rule config."""
+
+    event_name: str
+    origin: str
+    has_block_finality: bool
+    chain_func_name: Optional[str] = None
+    func_name: Optional[str] = None
+    func_condition: Optional[str] = None

@@ -7,8 +7,11 @@ from src.relayer.domain.relayer import (
     BridgeTaskDTO,
     EventDTO,
 )
-from src.relayer.provider.mock_relayer_blockchain_web3 import (
+from src.relayer.provider.mock_relayer_blockchain_web3_v2 import (
     MockRelayerBlockchainProvider
+)
+from src.relayer.domain.config import (
+    RelayerBlockchainConfigDTO
 )
 
 from tests.conftest import DATA_TEST
@@ -31,6 +34,7 @@ def event_dto():
     return EventDTO(
         name=event.event, # type: ignore
         data=event.args , # type: ignore
+        block_key=f'{event.blockNumber}-{event.transactionIndex}'
     )
 
 @pytest.fixture(scope="function")
@@ -47,7 +51,21 @@ def execute_contract_task(blockchain_provider):
         relayer_blockchain_provider=blockchain_provider,
         verbose=False
     )
-
+@pytest.fixture
+def get_blockchain_config():
+    config = RelayerBlockchainConfigDTO(
+        chain_id=123, 
+        rpc_url='https://fake.rpc_url.org', 
+        project_id='JMFW2926FNFKRMFJF1FNNKFNKNKHENFL', 
+        pk='abcdef12345678890abcdef12345678890abcdef12345678890abcdef1234567', 
+        wait_block_validation=6, 
+        block_validation_second_per_block=0,
+        smart_contract_address='0x1234567890abcdef1234567890abcdef12345678', 
+        genesis_block=123456789, 
+        abi=[{}], 
+        client='middleware'
+    )
+    return config
 # -------------------------------------------------------
 # T E S T S
 # -------------------------------------------------------

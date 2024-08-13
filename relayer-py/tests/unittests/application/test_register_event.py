@@ -9,7 +9,7 @@ from src.relayer.provider.mock_relayer_register_pika import (
     MockRelayerRegisterEvent,
 )
 from tests.conftest import DATA_TEST
-from utils.converter import to_bytes
+from src.utils.converter import to_bytes
 
 
 # -------------------------------------------------------
@@ -29,9 +29,11 @@ def register_provider(request):
 @pytest.fixture(scope="function")
 def event_dto():
     event = DATA_TEST.EVENT_SAMPLE.copy()
+    block_key = f"{event.blockNumber}-{event.transactionHash.hex()}-{event.logIndex}"
     return EventDTO(
         name=event.event, # type: ignore
-        data=event.args , # type: ignore
+        data=event.args, # type: ignore
+        block_key=block_key
     )
 
 

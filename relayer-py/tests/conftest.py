@@ -14,9 +14,9 @@ GENESIS_BLOCK = 987
 PROJECT_ID = "aaaa11a111a111a11a111aa1aaa1111a"
 ABI_NAME = "abi_test"
 WAIT_BLOCK_VALIDATION = 6
+BLOCK_VALIDATION_SECOND_PER_BLOCK = 0
 PK = "111aaa111aaa111aaa111aaaa111aaa111aaaa111aaaa111aaaa111aaa111aaa"
 CLIENT = "middleware"
-
 EVENT_SAMPLE = AttributeDict({
   'args': AttributeDict({
     'operationHash': '0xdc053a71d37822e8aa3f461c9e09f6fb37e9af9652d4e62f9197466806e62b5a',
@@ -40,8 +40,6 @@ EVENT_SAMPLE = AttributeDict({
   'blockHash': HexBytes('0x6bda9dc6b3e26f8972b75a45da645dfde50677335b40a7d217d8aee4b0b38b26'), 
   'blockNumber': 7866062
 })
-
-
 DATA_TEST = AttributeDict({
   "TEST_ENV_FILE": TEST_ENV_FILE,
   "CHAIN_ID": CHAIN_ID,
@@ -51,6 +49,7 @@ DATA_TEST = AttributeDict({
   "PROJECT_ID": PROJECT_ID,
   "ABI_NAME": ABI_NAME,
   "WAIT_BLOCK_VALIDATION": WAIT_BLOCK_VALIDATION,
+  "BLOCK_VALIDATION_SECOND_PER_BLOCK": BLOCK_VALIDATION_SECOND_PER_BLOCK,
   "PK": PK,
   "CLIENT": CLIENT,
   "TEST_ENV_VALUES": {
@@ -101,23 +100,23 @@ DATA_TEST = AttributeDict({
     "queue_name": "fake_queue_name",
   }),
   "EVENT_DTO": {
-        "name": 'FakeEventName',
-        "data": {'eventAttributeName': '0x1111111111111111111111111111111111111111'},
-    },
+    "name": 'FakeEventName',
+    "data": {'eventAttributeName': '0x1111111111111111111111111111111111111111'},
+    "block_key": "12345-0xb351dd79ccf7f10a514dadcedc37cc4b4b83050d393d0caf1dcc5e88bea5be0f-0"
+  },
   "EVENT_DATA": {
-        "event": 'FakeEventName',
-        "args": {'eventAttributeName': '0x1111111111111111111111111111111111111111'},
-        "address": '0x2111111111111111111111111111111111111111',
-        "logIndex": 1,
-        "transactionIndex": 1,
-        "transactionHash": HexBytes('0x2222222222222222222222222222222222222222222222222222222222222222'),
-        "blockHash": HexBytes('0x322222222222222222222222222222222222222222222222222222222222222'),
-        "blockNumber": 123456,
-    },
+    "event": 'FakeEventName',
+    "args": {'eventAttributeName': '0x1111111111111111111111111111111111111111'},
+    "address": '0x2111111111111111111111111111111111111111',
+    "logIndex": 1,
+    "transactionIndex": 1,
+    "transactionHash": HexBytes('0x2222222222222222222222222222222222222222222222222222222222222222'),
+    "blockHash": HexBytes('0x322222222222222222222222222222222222222222222222222222222222222'),
+    "blockNumber": 123456,
+  },
   "EVENT_SAMPLE": EVENT_SAMPLE
   },
 )
-
 
 sys.path.append(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/src")
