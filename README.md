@@ -196,7 +196,7 @@ https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fharmonie-endpoint-02.allfeat.io#/s
 | to             | FeesDepositConfirmed          | No               | from          | ReceiveFeesLockConfirmation          | NA               |
 | from           | FeesLockedConfirmed           | No               | from          | confirmFeesLockedAndDepositConfirmed | OperationCreated |
 | from           | FeesLockedAndDepositConfirmed | No               | to            | completeOperation                    | NA               |
-| to             | OperationFinalized            | No               | NA            | NA                                   | NA               |
+| to             | OperationFinalized            | No               | to            | receivedFinalizedOperation           | NA               |
 
 
 

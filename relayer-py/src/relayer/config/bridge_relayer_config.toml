@@ -2,7 +2,7 @@
 mode = "prod"
 
 [relayer_blockchain]
-
+    # Polygon testnet
     [relayer_blockchain.ChainId80002]
     rpc_url = "https://polygon-amoy.g.alchemy.com/v2/"
     project_id = "{{ PROJECT_ID_80002 }}"
@@ -12,6 +12,7 @@ mode = "prod"
     genesis_block = 8267279
     client = "middleware"
 
+    # Allfest tesnet 
     [relayer_blockchain.ChainId441]
     rpc_url = "https://harmonie-endpoint-02.allfeat.io/"
     project_id = "{{ PROJECT_ID_441 }}"
@@ -21,6 +22,7 @@ mode = "prod"
     genesis_block = 1091325
     client = ""
 
+    # Sepolia
     [relayer_blockchain.ChainId11155111]
     rpc_url = "https://eth-sepolia.g.alchemy.com/v2/"
     project_id = "{{ PROJECT_ID_11155111 }}"
@@ -30,7 +32,7 @@ mode = "prod"
     genesis_block = 6186178
     client = "middleware"
 
-
+  # Ethereum mainnet
   [relayer_blockchain.ChainId1]
     rpc_url = "https://eth-mainnet.g.alchemy.com/v2/"
     project_id = "{{ PROJECT_ID_1 }}"
@@ -49,28 +51,25 @@ password = "{{ RELAYER_REGISTER_PASSWORD }}"
 queue_name = "{{ RELAYER_REGISTER_QUEUE_NAME }}"
 
 [relayer_event_rules]
-    # event_name: str
-    # origin: str
-    # has_block_finality: bool
-    # chain_func_name: Optional[str] = None
-    # func_name: Optional[str] = None
-    # func_condition: Optional[str] = None
-    
     [relayer_event_rules.OperationCreated]
     origin = "chainIdFrom"
     has_block_finality = true
+    chain_func_name = 'chainIdTo'
+    func_name = "sendFeesLockConfirmation"
+    depends_on = 'FeesDeposited'
 
     [relayer_event_rules.FeesDeposited]
     origin = "chainIdTo"
     has_block_finality = true
     chain_func_name = 'chainIdTo'
-    func_name = "SendFeesLockConfirmation"
+    func_name = "sendFeesLockConfirmation"
+    depends_on = 'OperationCreated'
 
     [relayer_event_rules.FeesDepositConfirmed]
     origin = "chainIdTo"
     has_block_finality = false
     chain_func_name = 'chainIdFrom'
-    func_name = "ReceiveFeesLockConfirmation"
+    func_name = "receiveFeesLockConfirmation"
 
     [relayer_event_rules.FeesLockedConfirmed]
     origin = "chainIdFrom"
@@ -87,3 +86,5 @@ queue_name = "{{ RELAYER_REGISTER_QUEUE_NAME }}"
     [relayer_event_rules.OperationFinalized]
     origin = "chainIdTo"
     has_block_finality = false
+    chain_func_name = 'chainIdFrom'
+    func_name = "receivedFinalizedOperation"

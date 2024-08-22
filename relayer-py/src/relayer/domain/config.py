@@ -42,3 +42,4 @@ class EventRuleConfig:
     chain_func_name: Optional[str] = None
     func_name: Optional[str] = None
     func_condition: Optional[str] = None
+    depends_on: Optional[str] = None

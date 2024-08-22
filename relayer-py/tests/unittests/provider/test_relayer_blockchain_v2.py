@@ -1,26 +1,34 @@
 from datetime import datetime, timezone
 import logging
 from typing import List, Optional
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, PropertyMock, patch
 from hexbytes import HexBytes
 from attributedict.collections import AttributeDict
 import pytest
 
 from web3 import Web3
+from eth_account.datastructures import SignedTransaction
 from web3.contract.contract import Contract
 from web3.exceptions import BlockNotFound
 from web3.types import (
     EventData,
     LogReceipt,
+    BlockData,
 )
 
+from src.relayer.domain.config import (
+    RelayerBlockchainConfigDTO, 
+)
+from src.relayer.domain.relayer import BridgeTaskDTO, BridgeTaskTxResult
 from src.relayer.provider.relayer_blockchain_web3_v2 import (
     RelayerBlockchainProvider
 )
 from src.relayer.domain.exception import (
-    BridgeRelayerErrorBlockPending,
-    BridgeRelayerEventsNotFound,
-    BridgeRelayerFetchEventOutOfRetries,
+    RelayerErrorBlockPending,
+    RelayerEventsNotFound,
+    RelayerFetchEventOutOfRetries,
+    RelayerBlockchainFailedExecuteSmartContract,
+    RelayerClientVersionError,
 )
 
 
@@ -376,14 +384,6 @@ def get_event_abi():
     return SAMPLE_GET_EVENT_ABI
 
 @pytest.fixture
-def mock_provider(mock_w3, mock_config, mock_abi):
-    with patch('src.relayer.config.config.get_blockchain_config', return_value=mock_config):
-        with patch('src.relayer.config.config.get_abi', return_value=mock_abi):
-            provider = RelayerBlockchainProvider()
-            provider.w3 = mock_w3
-            return provider
-
-@pytest.fixture
 def mock_w3():
     mock = MagicMock(spec=Web3)
     mock.eth = MagicMock()
@@ -397,6 +397,36 @@ def mock_config():
 def mock_abi():
     return MagicMock()
 
+@pytest.fixture
+def mock_provider(mock_w3, mock_config, mock_abi):
+    with patch('src.relayer.config.config.get_blockchain_config', return_value=mock_config):
+        with patch('src.relayer.config.config.get_abi', return_value=mock_abi):
+            provider = RelayerBlockchainProvider()
+            provider.w3 = mock_w3
+            return provider
+        
+@pytest.fixture
+def bridge_task_dto():
+    return BridgeTaskDTO(
+        func_name="func_name",
+        params={"key": "value"},
+    )
+
+@pytest.fixture
+def get_blockchain_config():
+    config = RelayerBlockchainConfigDTO(
+        chain_id=123, 
+        rpc_url='https://fake.rpc_url.org', 
+        project_id='JMFW2926FNFKRMFJF1FNNKFNKNKHENFL', 
+        pk='abcdef12345678890abcdef12345678890abcdef12345678890abcdef1234567', 
+        wait_block_validation=6, 
+        block_validation_second_per_block=0,
+        smart_contract_address='0x1234567890abcdef1234567890abcdef12345678', 
+        genesis_block=123456789, 
+        abi=[{}], 
+        client='middleware'
+    )
+    return config        
 # -----------------------------------------------------------------
 # T E S T S
 # -----------------------------------------------------------------
@@ -459,7 +489,7 @@ def test_set_event_filter_raise_exception_with_invalid_events(provider, events):
         Test set_event_filter that raises BridgeRelayerEventsNotFound
         with an invalid event name provided
     """
-    with pytest.raises(BridgeRelayerEventsNotFound):
+    with pytest.raises(RelayerEventsNotFound):
         provider.set_event_filter(events=['invalid_event_name'])
 
 def test_set_provider_returns_web3_instance(provider):
@@ -591,7 +621,7 @@ def test_fetch_event_logs_raises_exception_out_of_retries(
     fetch_event_logs = MagicMock(side_effect=Exception("fake fetch exception"))
 
     with pytest.raises(
-        BridgeRelayerFetchEventOutOfRetries,
+        RelayerFetchEventOutOfRetries,
         match="Fetch event error! Out of retries!"
     ):
         provider._retry_web3_call(
@@ -636,7 +666,7 @@ def test_scan_chunk_raise_exception_block_idx_is_none_pending(
         mock_retry_web3_call.return_value = (mock_end_block, mock_events)
 
         with pytest.raises(
-            BridgeRelayerErrorBlockPending,
+            RelayerErrorBlockPending,
             match="Somehow tried to scan a pending block"
         ):
             provider.scan(
@@ -717,3 +747,179 @@ def test_scan_chunk_success_with_datetime_is_none(provider, event_datas):
         assert event_datas_dto.end_block == mock_end_block
         assert event_datas_dto.end_block_timestamp == mock_end_block_timestamp
         # assert event_datas_dto.event_data_keys == []
+
+
+
+
+def test_call_contract_func_success(
+    get_blockchain_config,
+    mock_provider, 
+    bridge_task_dto
+):
+    """
+        Test call_contract_func that returns a BridgeTaskTxResult instance
+    """
+    mock_provider.relay_blockchain_config = get_blockchain_config
+    mock_provider.w3_contract = MagicMock()
+
+    tx = mock_provider.call_contract_func(bridge_task_dto=bridge_task_dto)
+    assert isinstance(tx, BridgeTaskTxResult)
+
+def test_call_contract_func_failed(
+    get_blockchain_config,
+    mock_provider, 
+    bridge_task_dto
+):
+    """
+        Test call_contract_func that raise RelayerBlockchainFailedExecuteSmartContract
+    """
+    mock_provider.relay_blockchain_config = get_blockchain_config
+    mock_provider.w3_contract = MagicMock()
+    mock_provider._send_raw_tx = MagicMock(side_effect=Exception('Test Exception'))
+
+    with pytest.raises(
+        RelayerBlockchainFailedExecuteSmartContract,
+        match="Test Exception"
+    ):
+        mock_provider.call_contract_func(bridge_task_dto=bridge_task_dto)
+
+def test_get_block_number_success(mock_provider, mock_w3):
+    """
+        Test get_block_number that returns block number
+    """
+    mock_w3.eth.block_number = 100   
+    assert mock_provider.get_block_number() == 100
+    
+def test_build_tx_raise_exception(mock_provider, bridge_task_dto):
+    """
+        Test _build_tx that raise RelayerBlockchainFailedExecuteSmartContract
+    """
+    class Callback:
+        def __init__(self, **kwargs):
+            pass
+        def build_transaction(self, **kwargs):
+            raise Exception('Test Exception')
+
+    with pytest.raises(RelayerBlockchainFailedExecuteSmartContract):
+        mock_provider._build_tx(
+            func=Callback,
+            bridge_task_dto=bridge_task_dto,
+            account_address="0x0000000000000000000000000000000000000000",
+            nonce=1,
+        )
+
+def test_build_tx_success(mock_provider, bridge_task_dto):
+    """
+        Test _build_tx that returns the transaction as dict
+    """
+    class Callback:
+        def __init__(self, **kwargs):
+            pass
+        def build_transaction(self, **kwargs):
+            return {"k": "v"}
+    
+    transaction = mock_provider._build_tx(
+        func=Callback,
+        bridge_task_dto=bridge_task_dto,
+        account_address="0x0000000000000000000000000000000000000000",
+        nonce=1,
+    )
+    assert transaction == {"k": "v"}
+
+def test_sign_tx_raise_exception(mock_provider, mock_w3):
+    """
+        Test _sign_tx that raise RelayerBlockchainFailedExecuteSmartContract
+    """
+    mock_w3.eth.account = MagicMock()
+    mock_w3.eth.account.sign_transaction = MagicMock(side_effect=Exception('Test Exception'))
+
+    with pytest.raises(RelayerBlockchainFailedExecuteSmartContract):
+        mock_provider._sign_tx(
+            built_tx={"k": "v"},
+            account_key="0x0000000000000000000000000000000000000000"
+        )
+
+def test_sign_tx_success(mock_provider, mock_w3):
+    """
+        Test _sign_tx that returns the signed transaction
+    """
+    mock_w3.eth.account = MagicMock()
+    mock_w3.eth.account.sign_transaction = MagicMock(
+        spec=SignedTransaction, return_value='signed_tx'
+    )
+    
+    signed_tx = mock_provider._sign_tx(
+        built_tx={"k": "v"},
+        account_key="0x0000000000000000000000000000000000000000"
+    )
+    assert signed_tx == 'signed_tx'
+
+def test_send_raw_tx_raise_exception(mock_provider, mock_w3):
+    """
+        Test _send_raw_tx that raise RelayerBlockchainFailedExecuteSmartContract
+    """
+    mock_w3.eth = MagicMock()
+    mock_w3.eth.send_raw_transaction = MagicMock(side_effect=Exception('Test Exception'))
+
+    with pytest.raises(RelayerBlockchainFailedExecuteSmartContract):
+        mock_provider._send_raw_tx(signed_tx="signed_tx")
+
+def test_send_raw_tx_success(mock_provider, mock_w3):
+    """
+        Test _send_raw_tx that returns the transaction hash
+    """
+    mock_signed_tx = MagicMock()
+    mock_signed_tx._sign_tx = MagicMock()
+        
+    mock_w3.eth = MagicMock()
+    mock_w3.eth.send_raw_transaction = MagicMock(return_value=HexBytes(b'tx_hash'))
+    
+    tx_hash = mock_provider._send_raw_tx(signed_tx=mock_signed_tx)
+    assert tx_hash == HexBytes(b'tx_hash')
+
+def test_get_account_address_success(mock_provider, mock_w3, get_blockchain_config):
+    """
+        Test get_account_address that returns the account address
+    """ 
+    mock_provider.relay_blockchain_config = get_blockchain_config
+    mock_account = MagicMock()
+    mock_account.address = "0x0000000000000000000000000000000000000000"
+
+    mock_w3.eth.account = MagicMock()
+    mock_w3.eth.account.from_key = MagicMock(return_value=mock_account)
+    
+    address = mock_provider.get_account_address()
+    assert address =="0x0000000000000000000000000000000000000000"
+
+def test_client_version_success(mock_provider, mock_w3):
+    """
+        Test client_version that returns the client version
+    """
+    mock_w3.client_version = "777"
+    assert mock_provider.client_version() == "777"
+
+def test_client_version_failed(mock_provider, mock_w3):
+    """
+        Test client_version that raise RelayerClientVersionError
+    """
+    type(mock_w3).client_version = PropertyMock(
+        side_effect=Exception('Test exception'))
+
+    with pytest.raises(RelayerClientVersionError):
+        mock_provider.client_version()
+    
+def test_is_contract_deployed_returns_true(mock_provider, mock_w3):
+    """
+        Test is_contract_deployed that returns True
+    """
+    mock_provider.w3_contract = MagicMock()
+    mock_w3.eth.get_code = MagicMock()
+    assert mock_provider.is_contract_deployed() is True 
+
+def test_is_contract_deployed_returns_false(mock_provider, mock_w3):
+    """
+        Test is_contract_deployed that returns False
+    """
+    mock_provider.w3_contract = MagicMock()
+    mock_w3.eth.get_code = MagicMock(side_effect=Exception('Test Exception'))
+    assert mock_provider.is_contract_deployed() is False

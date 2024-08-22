@@ -11,9 +11,6 @@ from src.relayer.domain.relayer import (
 from tests.conftest import (
     DATA_TEST,
 )
-
-
-
 # -------------------------------------------------------
 # F I X T U R E S
 # -------------------------------------------------------

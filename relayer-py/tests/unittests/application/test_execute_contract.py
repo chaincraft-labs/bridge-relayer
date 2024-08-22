@@ -1,24 +1,33 @@
+import logging
 from unittest.mock import MagicMock
 import pytest
 
 from src.relayer.application.execute_contract import ExecuteContractTask
-
 from src.relayer.domain.relayer import (
     BridgeTaskDTO,
+    BridgeTaskTxResult,
     EventDTO,
 )
 from src.relayer.provider.mock_relayer_blockchain_web3_v2 import (
     MockRelayerBlockchainProvider
 )
-from src.relayer.domain.config import (
-    RelayerBlockchainConfigDTO
+from src.relayer.domain.config import RelayerBlockchainConfigDTO
+from src.relayer.domain.exception import (
+    RelayerBlockchainFailedExecuteSmartContract,
 )
-
 from tests.conftest import DATA_TEST
 
 # -------------------------------------------------------
 # F I X T U R E S
 # -------------------------------------------------------
+@pytest.fixture(autouse=True)
+def disable_logging():
+    # Disable logging during tests
+    logging.disable(logging.CRITICAL)
+    yield
+    # Enable loggin after tests
+    logging.disable(logging.NOTSET)
+    
 @pytest.fixture(scope="function")
 def blockchain_provider(request):
     # parameters for MockChainProvider
@@ -48,9 +57,7 @@ def bridge_task_dto():
 @pytest.fixture(scope="function")
 def execute_contract_task(blockchain_provider):
     return ExecuteContractTask(
-        relayer_blockchain_provider=blockchain_provider,
-        verbose=False
-    )
+        relayer_blockchain_provider=blockchain_provider)
 @pytest.fixture
 def get_blockchain_config():
     config = RelayerBlockchainConfigDTO(
@@ -73,11 +80,8 @@ def get_blockchain_config():
 def test_execute_contract_task_init(blockchain_provider):
     """Test ExecuteContractTask init."""
     app = ExecuteContractTask(
-        relayer_blockchain_provider=blockchain_provider,
-        verbose=False
-    )
+        relayer_blockchain_provider=blockchain_provider)
     assert app.rb_provider == blockchain_provider
-    assert app.verbose is False
 
 def test_call_contract_func_print_err_with_failed_tx(
         execute_contract_task,
@@ -90,19 +94,12 @@ def test_call_contract_func_print_err_with_failed_tx(
     """
     app = execute_contract_task
     blockchain_provider.exception = Exception("fake Tx exception")
-    app.print_log = MagicMock(side_effect=app.print_log)
+    with pytest.raises(
+        RelayerBlockchainFailedExecuteSmartContract,
+        match="fake Tx exception"
+    ):
+        app.call_contract_func(chain_id=80002, bridge_task_dto=bridge_task_dto)
 
-    app.call_contract_func(
-        chain_id=80002,
-        bridge_task_dto=bridge_task_dto
-    )
-
-    app.print_log.assert_called_with("fail", (
-        f"Transaction failed chain_id=80002 "
-        f"func_name={bridge_task_dto.func_name} "
-        f"params={bridge_task_dto.params} "
-        f"error=fake Tx exception"
-    ))
 
 def test_call_contract_func_print_success_with_valid_tx(
         execute_contract_task,
@@ -115,19 +112,9 @@ def test_call_contract_func_print_success_with_valid_tx(
     """
     app = execute_contract_task
     blockchain_provider.tx_hash = "0x7d90ac3daf3ced0d01adbde94f2f4fe0eb2d79ce55b7bab9e08d6cac4b3ea01c"
-    app.print_log = MagicMock(side_effect=app.print_log)
-
-    app.call_contract_func(
-        chain_id=80002,
-        bridge_task_dto=bridge_task_dto
-    )
-
-    app.print_log.assert_called_with("success", (
-        f"Transaction success chain_id=80002 "
-        f"func_name={bridge_task_dto.func_name} "
-        f"params={bridge_task_dto.params} "
-        f"Transaction_hash={blockchain_provider.tx_hash}"
-    ))
+    tx = app.call_contract_func(chain_id=80002, bridge_task_dto=bridge_task_dto)
+    assert tx.tx_hash == "0x7d90ac3daf3ced0d01adbde94f2f4fe0eb2d79ce55b7bab9e08d6cac4b3ea01c"
+    assert isinstance(tx, BridgeTaskTxResult)
 
 def test_call_that_call_contract_func(
     execute_contract_task,

@@ -1,28 +1,27 @@
 from argparse import ArgumentParser, Namespace, RawDescriptionHelpFormatter
+import asyncio
 import os
 from os.path import basename
 import sys
 from sys import argv
 from textwrap import dedent
 
-
 current_dir: str = os.path.dirname(os.path.abspath(__file__))
 parent_dir: str = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
-from src.relayer.application.app import App  # noqa: E402
-from src.relayer.provider.relayer_blockchain_web3 import (  # noqa: E402
-    RelayerBlockchainProvider as p_relayer_blockchain,
-)
-from src.relayer.provider.relayer_register_pika import (  # noqa: E402
-    RelayerRegisterEvent as p_relayer_register,
-)
+from src.relayer.application.listen_events import ListeEvents  # noqa: E402
+from src.relayer.provider.relayer_blockchain_web3 import RelayerBlockchainProvider  # noqa: E402
+from src.relayer.provider.relayer_register_aio_pika import RelayerRegisterEvent  # noqa: E402
+from src.relayer.provider.relayer_event_storage import EventDataStoreToFile  # noqa: E402
 
 
-def app(chain_id: int, debug: bool = False) -> None:
+async def app(chain_id: int, debug: bool = False) -> None:
+    log_level = 'debug' if debug else 'info'
     # providers
-    rb_provider = p_relayer_blockchain()
-    rr_provider = p_relayer_register()
+    rb_provider = RelayerBlockchainProvider(log_level=log_level)
+    rr_provider = RelayerRegisterEvent(log_level=log_level)
+    es_provider = EventDataStoreToFile(log_level=log_level)
 
     # Set event filters
     event_filters = [
@@ -35,13 +34,17 @@ def app(chain_id: int, debug: bool = False) -> None:
     ]
 
     # Call apps
-    apps = App(
+    await ListeEvents(
+        chain_id=chain_id,
+        event_filters=event_filters,
         relayer_blockchain_provider=rb_provider,
-        relayer_register_provider=rr_provider
-    )
+        relayer_register_provider=rr_provider,
+        event_datastore_provider=es_provider,
+        log_level=log_level,
+    )(as_service=True, progress_bar=False)
 
-    # Listen events
-    apps(chain_id=chain_id, event_filters=event_filters)
+    # Scan events
+    # await apps(as_service=True, progress_bar=False)
 
 
 class Parser:
@@ -84,7 +87,7 @@ if __name__ == "__main__":
         args: Namespace = parser()
 
         if args.chain_id:
-            app(chain_id=int(args.chain_id), debug=args.debug)
+            asyncio.run(app(chain_id=int(args.chain_id), debug=args.debug))
 
         else:
             print("[ 💔 ] chain_id is missing!\n")

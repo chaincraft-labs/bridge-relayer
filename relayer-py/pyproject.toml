@@ -16,6 +16,7 @@ attributedict = "^0.3.0"
 tomli = "^2.0.1"
 jinja2 = "^3.1.4"
 tqdm = "^4.66.4"
+aio-pika = "^9.4.3"
 
 
 [tool.poetry.group.test.dependencies]

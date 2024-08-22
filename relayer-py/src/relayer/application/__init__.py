@@ -1,13 +1,15 @@
+"""Base Relayer application."""
 from dataclasses import dataclass
 from enum import Enum
 
 
 @dataclass
 class BaseApp:
-    """"""
+    """Base application."""
 
     class Emoji(Enum):
-        """"""
+        """Emoji enum."""
+
         none = ""
         main = "💠 "
         receive = "📩 "
@@ -20,11 +22,20 @@ class BaseApp:
         sendTx = "🟣 "
         receiveEvent = "🔵 "
         blockFinality = "🟡 "
+        green = "🟢 "
+        blue = "🔵 "
+        yellow = "🟡 "
+        orange = "🟠 "
+        violet = "🟣 "
+        red = "🔴 "
 
 
-    def print_log(self, status, message):
-        """Print a log."""
+    def print_log(self, status: str, message: str):
+        """Print log.
 
-        if self.verbose:
-            print(f"{self.Emoji[status].value}{message}")
+        Args:
+            status (str): The status
+            message (str): The message
+        """
+        print(f"{self.Emoji[status].value}{message}")
 

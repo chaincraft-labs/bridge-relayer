@@ -41,7 +41,7 @@ def event_dto():
 def register_event(register_provider):
     return RegisterEvent(
         relayer_register_provider=register_provider,
-        verbose=False
+        log_level='info'
     )
 
 # -------------------------------------------------------

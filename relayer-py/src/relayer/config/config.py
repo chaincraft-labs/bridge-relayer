@@ -1,9 +1,10 @@
 """Bridge relayer configuration."""
 import json
-import pathlib
 import os
+import pathlib
 from typing import Any, Dict
 from dotenv import load_dotenv
+
 import tomli
 from jinja2 import Template
 
@@ -13,13 +14,13 @@ from src.relayer.domain.config import (
     RelayerRegisterConfigDTO,
 )
 from src.relayer.domain.exception import (
-    BridgeRelayerConfigABIAttributeMissing, 
-    BridgeRelayerConfigABIFileMissing, 
-    BridgeRelayerConfigBlockchainDataMissing,
-    BridgeRelayerConfigEventRuleKeyError, 
-    BridgeRelayerConfigRegisterDataMissing, 
-    BridgeRelayerConfigReplacePlaceholderTypeError, 
-    BridgeRelayerConfigTOMLFileMissing,
+    RelayerConfigABIAttributeMissing, 
+    RelayerConfigABIFileMissing, 
+    RelayerConfigBlockchainDataMissing,
+    RelayerConfigEventRuleKeyError, 
+    RelayerConfigRegisterDataMissing, 
+    RelayerConfigReplacePlaceholderTypeError, 
+    RelayerConfigTOMLFileMissing,
 )
 
 FILE_ABI_DEV = "abi_dev.json"
@@ -100,7 +101,7 @@ def get_config_content(toml_file: str) -> str:
             config_content: str = file.read()
             return config_content
     except FileNotFoundError as e:
-        raise BridgeRelayerConfigTOMLFileMissing(e)
+        raise RelayerConfigTOMLFileMissing(e)
     
     
 def replace_placeholders(config_content: str) -> str:
@@ -119,9 +120,26 @@ def replace_placeholders(config_content: str) -> str:
         rendered_content: str = template.render(os.environ)
         return rendered_content
     except TypeError as e:
-        raise BridgeRelayerConfigReplacePlaceholderTypeError(e)
+        raise RelayerConfigReplacePlaceholderTypeError(e)
 
 
+def get_bridge_relayer_config()-> Dict[str, Any]:
+    """Get the bridge relayer config values.
+
+    Returns:
+        Dict[str, Any]: The bridge relayer config
+    """
+    toml_file: str = get_toml_file()
+    config_content: str = get_config_content(toml_file=toml_file)
+    rendered_content: str = replace_placeholders(config_content)
+    _bridge_relayer_config: Dict[str, Any] = tomli.loads(rendered_content)
+    
+    return _bridge_relayer_config
+
+
+# ---------------------------------------------------------------------------
+# Exported functions
+# ---------------------------------------------------------------------------
 def get_abi(chain_id: int) -> Any:
     """Get the ABI content.
 
@@ -139,22 +157,9 @@ def get_abi(chain_id: int) -> Any:
             abi: Any = json.loads(f.read())
             return abi[str(chain_id)]
     except FileNotFoundError as e:
-        raise BridgeRelayerConfigABIFileMissing(e)
+        raise RelayerConfigABIFileMissing(e)
     except KeyError as e:
-        raise BridgeRelayerConfigABIAttributeMissing(e)
-
-def _get_bridge_relayer_config()-> Dict[str, Any]:
-    """Get the bridge relayer config values.
-
-    Returns:
-        Dict[str, Any]: The bridge relayer config
-    """
-    toml_file: str = get_toml_file()
-    config_content: str = get_config_content(toml_file=toml_file)
-    rendered_content: str = replace_placeholders(config_content)
-    _bridge_relayer_config: Dict[str, Any] = tomli.loads(rendered_content)
-    
-    return _bridge_relayer_config
+        raise RelayerConfigABIAttributeMissing(e)
 
 
 def get_blockchain_config(chain_id: int) -> RelayerBlockchainConfigDTO:
@@ -166,7 +171,7 @@ def get_blockchain_config(chain_id: int) -> RelayerBlockchainConfigDTO:
     Returns:
         RelayerBlockchainDTO: The bridge relayer blockchain config DTO
     """
-    _bridge_relayer_config: Dict[str, Any] = _get_bridge_relayer_config()
+    _bridge_relayer_config: Dict[str, Any] = get_bridge_relayer_config()
     relayer_blockchain: Dict[str, Any] = {}
     
     for k, v in _bridge_relayer_config['relayer_blockchain'].items():
@@ -180,7 +185,7 @@ def get_blockchain_config(chain_id: int) -> RelayerBlockchainConfigDTO:
     try:
         return RelayerBlockchainConfigDTO(**relayer_blockchain)
     except TypeError as e:
-        raise BridgeRelayerConfigBlockchainDataMissing(
+        raise RelayerConfigBlockchainDataMissing(
             f"chain_id={chain_id} Error={e} _bridge_relayer_config={_bridge_relayer_config}"
         )
 
@@ -191,7 +196,7 @@ def get_register_config() -> RelayerRegisterConfigDTO:
     Returns:
         RelayerRegisterDTO: The bridge relayer event register config DTO
     """
-    _bridge_relayer_config: Dict[str, Any] = _get_bridge_relayer_config()
+    _bridge_relayer_config: Dict[str, Any] = get_bridge_relayer_config()
     try:
         for k, v in _bridge_relayer_config['relayer_register'].items():
             if k == "port":
@@ -199,7 +204,7 @@ def get_register_config() -> RelayerRegisterConfigDTO:
 
         return RelayerRegisterConfigDTO(**_bridge_relayer_config['relayer_register'])
     except TypeError as e:
-        raise BridgeRelayerConfigRegisterDataMissing(e)
+        raise RelayerConfigRegisterDataMissing(e)
 
 
 def get_relayer_event_rule(event_name: str) -> EventRuleConfig:
@@ -210,8 +215,11 @@ def get_relayer_event_rule(event_name: str) -> EventRuleConfig:
 
     Returns:
         EventRuleConfig: The bridge relayer event rule config DTO
+
+    Raises:
+        BridgeRelayerConfigEventRuleKeyError: If the event rule key is not found
     """
-    _bridge_relayer_config: Dict[str, Any] = _get_bridge_relayer_config()
+    _bridge_relayer_config: Dict[str, Any] = get_bridge_relayer_config()
     data: Dict[str, Any] = {}
     
     for k, v in _bridge_relayer_config['relayer_event_rules'].items():
@@ -224,4 +232,4 @@ def get_relayer_event_rule(event_name: str) -> EventRuleConfig:
     try:
         return EventRuleConfig(**data)
     except TypeError as e:
-        raise BridgeRelayerConfigEventRuleKeyError(e)
+        raise RelayerConfigEventRuleKeyError(e)

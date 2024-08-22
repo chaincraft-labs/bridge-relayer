@@ -1,4 +1,5 @@
 import logging
+import pytest
 from unittest.mock import MagicMock, patch
 from pika import (
     BasicProperties,
@@ -9,17 +10,14 @@ from pika import (
 from pika.spec import Basic
 from pika.adapters.blocking_connection import BlockingChannel
 from pika.exceptions import AMQPConnectionError
-import pytest
-
-from src.relayer.config.config import get_register_config
 
 from src.relayer.domain.exception import (
-    BridgeRelayerReadEventFailed,
-    BridgeRelayerRegisterChannelError,
-    BridgeRelayerRegisterConnectionError,
-    BridgeRelayerRegisterCredentialError,
-    BridgeRelayerRegisterDeclareQueueError,
-    BridgeRelayerRegisterEventFailed
+    RelayerReadEventFailed,
+    RelayerRegisterChannelError,
+    RelayerRegisterConnectionError,
+    RelayerRegisterCredentialError,
+    RelayerRegisterDeclareQueueError,
+    RelayerRegisterEventFailed
 )
 from src.relayer.domain.relayer import EventDTO
 from src.relayer.domain.config import RelayerRegisterConfigDTO
@@ -92,7 +90,7 @@ def test_register_event_fail_with_exception(provider, event_dto):
     """
     event_bytes = to_bytes(event_dto)
     provider._send_message = MagicMock(side_effect=Exception("fake error"))
-    with pytest.raises(BridgeRelayerRegisterEventFailed) as e:
+    with pytest.raises(RelayerRegisterEventFailed) as e:
         provider.register_event(event=event_bytes)
 
     assert str(e.value.args[0]) == "fake error"
@@ -123,7 +121,7 @@ def test_read_events_fail_with_exception(
         pass
 
     provider._consume_message = MagicMock(side_effect=Exception("fake error"))
-    with pytest.raises(BridgeRelayerReadEventFailed) as e:
+    with pytest.raises(RelayerReadEventFailed) as e:
         provider.read_events(callback=callback)
 
     assert str(e.value.args[0]) == "fake error"
@@ -163,7 +161,7 @@ def test_get_connection_parameters_raise_exception(mock_pika, provider):
     """
     credentials = provider._get_credentials()
     mock_pika.side_effect = TypeError("fake error")    
-    with pytest.raises(BridgeRelayerRegisterCredentialError) as e:
+    with pytest.raises(RelayerRegisterCredentialError) as e:
         provider._get_connection_parameters(credentials=credentials)
 
     assert str(e.value.args[0]) == "fake error"
@@ -195,7 +193,7 @@ def test_get_connection_raise_exception(mock_pika, provider):
         credentials=credentials
     )
     mock_pika.side_effect = ValueError("fake value error")
-    with pytest.raises(BridgeRelayerRegisterConnectionError) as e:
+    with pytest.raises(RelayerRegisterConnectionError) as e:
         provider._get_connection(params=connection_parameters)
     
     assert str(e.value.args[0]) == "fake value error"
@@ -219,7 +217,7 @@ def test_get_channel_raise_exception(provider):
     """
     connection = MagicMock()
     connection.channel = MagicMock(side_effect=AttributeError("fake attr error"))
-    with pytest.raises(BridgeRelayerRegisterChannelError) as e:
+    with pytest.raises(RelayerRegisterChannelError) as e:
         provider._get_channel(connection=connection)
 
     assert str(e.value.args[0]) == "fake attr error"
@@ -245,7 +243,7 @@ def test_declare_queue_raise_exception(provider):
     """
     channel = MagicMock()
     channel.queue_declare = MagicMock(side_effect=AttributeError("fake attr error"))
-    with pytest.raises(BridgeRelayerRegisterDeclareQueueError) as e:
+    with pytest.raises(RelayerRegisterDeclareQueueError) as e:
         provider._declare_queue(channel, "a.queue.name")
 
     assert str(e.value.args[0]) == "fake attr error"
@@ -273,7 +271,7 @@ def test_connect_raise_exception(provider):
     provider._get_connection_parameters = MagicMock()
     provider._get_connection = MagicMock(side_effect=AMQPConnectionError("fake error"))
     
-    with pytest.raises(BridgeRelayerRegisterConnectionError) as e:
+    with pytest.raises(RelayerRegisterConnectionError) as e:
         provider._connect()
 
     assert str(e.value.args[0]) == "fake error"

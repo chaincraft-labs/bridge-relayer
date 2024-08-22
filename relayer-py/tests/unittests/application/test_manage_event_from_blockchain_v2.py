@@ -114,7 +114,10 @@ def manage_event_from_blockchain(
             event_datastore_provider=event_datastore_provider,
             chain_id=123,
             event_filters=EVENT_FILTERS,
-            verbose=False
+            min_scan_chunk_size=10,
+            max_scan_chunk_size=10000,
+            chunk_size_increase=2.0,
+            log_level='info',
         )
     
         app.register_config = register_config
@@ -194,7 +197,7 @@ def event_datas():
 # -------------------------------------------------------
 # T E S T S
 # -------------------------------------------------------
-@pytest.mark.event_store_data(chain_id=123)
+
 @pytest.mark.register_provider_data
 def test_init_instance(
     blockchain_provider, 
@@ -214,7 +217,7 @@ def test_init_instance(
             event_datastore_provider=event_datastore_provider,
             chain_id=123,
             event_filters=EVENT_FILTERS,
-            verbose=False
+            log_level='info',
         )
 
         app.register_config = register_config
@@ -224,14 +227,14 @@ def test_init_instance(
     assert app.evt_store == event_datastore_provider
     assert app.chain_id ==  123
     assert app.event_filters == EVENT_FILTERS
-    assert app.verbose is False
+    assert app.log_level == 'info'
     assert app.register_config.host == 'localhost'
     assert app.register_config.port == 5672
     assert app.register_config.user == 'guest'
     assert app.register_config.password == 'guest'
     assert app.register_config.queue_name == 'bridge.relayer.dev'
 
-@pytest.mark.event_store_data(chain_id=123)
+
 @pytest.mark.parametrize('data, expected', [
     ({'event_found_count': 0, 'current_chuck_size': 20}, 40),
     ({'event_found_count': 0, 'current_chuck_size': 40}, 80),
@@ -256,7 +259,7 @@ def test_estimate_next_chunk_size_(manage_event_from_blockchain, data, expected)
     )
     assert chuck_size == expected
 
-@pytest.mark.event_store_data(chain_id=123)
+
 def test_scan_success(
     blockchain_provider,
     manage_event_from_blockchain,
@@ -290,7 +293,7 @@ def test_scan_success(
         assert all_event_datas[0].block_datetime == event_datas.event_datas[0].block_datetime
         assert total_chunks_scanned == 1
 
-@pytest.mark.event_store_data(chain_id=123)
+
 def test_run_scan_with_progress_bar_render(
     blockchain_provider,
     manage_event_from_blockchain,
@@ -323,7 +326,7 @@ def test_run_scan_with_progress_bar_render(
         assert all_event_datas[0].block_datetime == event_datas.event_datas[0].block_datetime
         assert total_chunks_scanned == 1
 
-@pytest.mark.event_store_data(chain_id=123)
+
 def test_create_event_dto(manage_event_from_blockchain, event_datas):
     """
         Test create_event_dto that returns an event_dto
@@ -332,7 +335,7 @@ def test_create_event_dto(manage_event_from_blockchain, event_datas):
     event_dto = app.create_event_dto(event_data=event_datas.event_datas[0])
     assert isinstance(event_dto, EventDTO)
 
-@pytest.mark.event_store_data(chain_id=123)
+
 def test_call_success(
     manage_event_from_blockchain, 
     event_datas,
@@ -364,10 +367,9 @@ def test_call_success(
     with patch.object(app, 'scan', return_value=event_datas_scan_result) as mock_scan:
         app(
             start_chunk_size=20,
-            chain_reorg_safety_blocks=10,
+            block_to_delete=10,
             progress_bar=False,
             auto_commit=True,
-            verbose=False
         )
         mock_scan.assert_called_with(
             start_block=14830,
@@ -378,7 +380,7 @@ def test_call_success(
         event_datastore_provider.save_event.assert_called()
         register_provider.register_event.assert_called()
 
-@pytest.mark.event_store_data(chain_id=123)
+
 def test_call_with_error(
     manage_event_from_blockchain, 
     event_datastore_provider,
@@ -398,10 +400,9 @@ def test_call_with_error(
     with patch.object(app, 'scan', return_value=event_datas_scan_result) as mock_scan:
         app(
             start_chunk_size=20,
-            chain_reorg_safety_blocks=10,
+            block_to_delete=10,
             progress_bar=False,
             auto_commit=True,
-            verbose=False
         )
         mock_scan.assert_called_with(
             start_block=14830,

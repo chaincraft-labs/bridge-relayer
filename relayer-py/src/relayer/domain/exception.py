@@ -1,117 +1,110 @@
 """Relayer exception."""
 
 
-class BridgeRelayerException(Exception):
+class RelayerException(Exception):
     """Base Relay exception class."""
 
 # Configuration
-class BridgeRelayerConfigEnvFileMissing(BridgeRelayerException):
-    """Raise when the '.env' file is missing."""
-    
 
-class BridgeRelayerConfigEnvFileAttributeMissing(BridgeRelayerException):
-    """Raise when an attribute is missing from .env file."""
-
-    
-class BridgeRelayerConfigABIFileMissing(BridgeRelayerException):
+class RelayerConfigABIFileMissing(RelayerException):
     """Raise when the 'abi.json' file is missing."""
 
-    
-class BridgeRelayerConfigTOMLFileMissing(BridgeRelayerException):
+
+class RelayerConfigTOMLFileMissing(RelayerException):
     """Raise when the '.toml' file is missing."""
 
+
     
-class BridgeRelayerConfigABIAttributeMissing(BridgeRelayerException):
+class RelayerConfigABIAttributeMissing(RelayerException):
     """Raise when an ABI attribute is missing from abi.json file."""
 
 
-class BridgeRelayerConfigBlockchainDataMissing(BridgeRelayerException):
+class RelayerConfigBlockchainDataMissing(RelayerException):
     """Raise when no blockchain config retrieved for a specific chain id."""
 
 
-class BridgeRelayerConfigRegisterDataMissing(BridgeRelayerException):
+class RelayerConfigRegisterDataMissing(RelayerException):
     """Raise when no register config retrieved."""
 
 
-class BridgeRelayerConfigReplacePlaceholderTypeError(BridgeRelayerException):
+class RelayerConfigReplacePlaceholderTypeError(RelayerException):
     """Raise when bad args provided to replace placeholder."""
 
 
-class BridgeRelayerConfigEventRuleKeyError(BridgeRelayerException):
+class RelayerConfigEventRuleKeyError(RelayerException):
     """Raise when invalid event name provided."""
 
+# Blockchain
 
-# Blockchain events
-class BridgeRelayerEventDataMissing(BridgeRelayerException):
-    """Raise when an event is receive but data are missing."""
-
-
-class BridgeRelayerBlockchainNotConnected(BridgeRelayerException):
-    """Raise when not connected to bloclchain client."""
+class RelayerEventsNotFound(RelayerException):
+    """Raise when events not found."""
 
 
-class BridgeRelayerListenEventFailed(BridgeRelayerException):
-    """Raise when event listener failed."""
-
-
-class BridgeRelayerEventsFilterTypeError(BridgeRelayerException):
-    """Raise when events filter is invalid type."""
-
-
-class BridgeRelayerEventsNotFound(BridgeRelayerException):
-    """Raise when events not founds in ABI."""
-
-
-class BridgeRelayerInvalidStartBlock(BridgeRelayerException):
-    """Raise when start block is greater than end block."""
-
-
-class BridgeRelayerErrorBlockPending(BridgeRelayerException):
+class RelayerErrorBlockPending(RelayerException):
     """Raise when a block is in pending status."""
 
 
-class BridgeRelayerFetchEventOutOfRetries(BridgeRelayerException):
+class RelayerFetchEventOutOfRetries(RelayerException):
     """Raise when max retries has been reach while fetchin event data from RPC."""
+
+
+class RelayerEventScanFailed(RelayerException):
+    """Raise when event scan failed."""
 
 
 # Register events
 
-class BridgeRelayerRegisterEventFailed(BridgeRelayerException):
+class RelayerRegisterEventFailed(RelayerException):
     """Raise when register event failed."""
 
 
-class BridgeRelayerReadEventFailed(BridgeRelayerException):
+class RelayerReadEventFailed(RelayerException):
     """Raise when read an event failed."""
 
 
-class BridgeRelayerRegisterCredentialError(BridgeRelayerException):
-    """Raise when trying to set credential for register."""
-    
-    
-class BridgeRelayerRegisterConnectionError(BridgeRelayerException):
-    """Raise when connecting to register platform failed."""
-    
-    
-class BridgeRelayerRegisterChannelError(BridgeRelayerException):
-    """Raise when creating channel failed."""
-    
-    
-class BridgeRelayerRegisterDeclareQueueError(BridgeRelayerException):
-    """Raise when declaring a queue failed."""
-
-
 # Event Converter 
-class EventConverterTypeError(BridgeRelayerException):
+class EventConverterTypeError(RelayerException):
     """Raise when trying to create an EventDTO from event."""
 
 
-# Event Consumer
-class BlockFinalityTimeExceededError(BridgeRelayerException):
+# Consumer / Execute smart contract function
+class RelayerBlockFinalityTimeExceededError(RelayerException):
     """Raise when The function has exceeded the allocated time for processing."""
+
+
+class RelayerBlockchainFailedExecuteSmartContract(RelayerException):
+    """Raise when execute smart contract function failed."""
+
+
+class RelayerClientVersionError(RelayerException):
+    """Raise when retrieve client version failed."""
+
+
+class RelayerBlockValidityError(RelayerException):
+    """Raise when block validity failed."""
+
+
+class RelayerCalculateBLockFinalityError(RelayerException):
+    """Raise when calculate block finality failed."""
+
+
+class RelayerBlockValidationFailed(RelayerException):
+    """Raise when block validation failed."""
 
 
 #  Event data stored
 
-class EventDataStoreRegisterFailed(BridgeRelayerException):
+class EventDataStoreRegisterFailed(RelayerException):
     """Raise when the event cannot be set as registered in the state."""
-    
+
+
+class EventDataStoreSaveEventOperationError(RelayerException):
+    """Raise when the event task cannot be save to the state."""
+
+
+class EventDataStoreNoBlockToDelete(RelayerException):
+    """Raise when there is no block to delete from event state."""
+
+
+class EventDataStoreStateEmptyOrNotLoaded(RelayerException):
+    """Raise when the state is empty or not loaded."""

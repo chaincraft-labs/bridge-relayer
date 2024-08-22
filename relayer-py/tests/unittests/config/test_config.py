@@ -10,13 +10,13 @@ from src.relayer.domain.config import (
     RelayerRegisterConfigDTO,
 )
 from src.relayer.domain.exception import (
-    BridgeRelayerConfigABIAttributeMissing, 
-    BridgeRelayerConfigABIFileMissing, 
-    BridgeRelayerConfigBlockchainDataMissing,
-    BridgeRelayerConfigEventRuleKeyError,
-    BridgeRelayerConfigRegisterDataMissing, 
-    BridgeRelayerConfigReplacePlaceholderTypeError, 
-    BridgeRelayerConfigTOMLFileMissing
+    RelayerConfigABIAttributeMissing, 
+    RelayerConfigABIFileMissing, 
+    RelayerConfigBlockchainDataMissing,
+    RelayerConfigEventRuleKeyError,
+    RelayerConfigRegisterDataMissing, 
+    RelayerConfigReplacePlaceholderTypeError, 
+    RelayerConfigTOMLFileMissing
 )
 
 from src.relayer.config.config import load_env_file
@@ -96,16 +96,16 @@ def test_get_blockchain_config_returns_dto_with_chain_id(config, blockchain_conf
         assert blockchain_config_dto.project_id == 'JMFW2926FNFKRMFJF1FNNKFNKNKHENFL'
         assert blockchain_config_dto.pk == 'abcdef12345678890abcdef12345678890abcdef12345678890abcdef1234567'
         assert blockchain_config_dto.abi == [{}]
-    
+
 def test_get_blockchain_config_raise_exception_with_bad_chain_id(config):
     """
         Test get_blockchain_config raises 
         BridgeRelayerConfigBlockchainDataMissing with missing positional 
         arguments.
     """
-    with pytest.raises(BridgeRelayerConfigBlockchainDataMissing):
+    with pytest.raises(RelayerConfigBlockchainDataMissing):
         config.get_blockchain_config(chain_id=0)
-    
+
 def test_get_register_config_returns_dto_with(config, register_config):
     """
         Test get_register_config returns a RelayerRegisterConfigDTO DTO.
@@ -118,7 +118,7 @@ def test_get_register_config_returns_dto_with(config, register_config):
         assert register_config_dto.user == "guest"
         assert register_config_dto.queue_name == "bridge.relayer.dev"
 
-    
+
 def test_get_register_config_raise_exception_with_data_missing(config):
     """
         Test get_register_config raises 
@@ -126,7 +126,7 @@ def test_get_register_config_raise_exception_with_data_missing(config):
         arguments.
     """
     with patch('src.relayer.config.config._get_bridge_relayer_config'):
-        with pytest.raises(BridgeRelayerConfigRegisterDataMissing):
+        with pytest.raises(RelayerConfigRegisterDataMissing):
             config.get_register_config()
 
 def test_bridge_relayer_config_envi_is_dev(config):
@@ -167,14 +167,14 @@ def test_get_toml_file_returns_prod_env(config_prod):
         Test get_toml_file that returns the toml_file for prod env.
     """
     assert config_prod.get_toml_file() == config_prod.FILE_TOML_PRD
-    
+
 def test_get_config_content_raise_exception_toml_file_missing(config):
     """
         Test get_config_content that raises BridgeRelayerConfigTOMLFileMissing 
         if file is missing.
     """
     toml_file: str = "missing_file"
-    with pytest.raises(BridgeRelayerConfigTOMLFileMissing):
+    with pytest.raises(RelayerConfigTOMLFileMissing):
         config.get_config_content(toml_file)
 
 @pytest.mark.parametrize("config_content", [
@@ -192,9 +192,9 @@ def test_replace_placeholders_raise_exception_with_bad_content(
         Test replace_placeholders that raises 
         BridgeRelayerConfigReplacePlaceholderTypeError with bad_content.
     """
-    with pytest.raises(BridgeRelayerConfigReplacePlaceholderTypeError):
+    with pytest.raises(RelayerConfigReplacePlaceholderTypeError):
         config.replace_placeholders(config_content)
-    
+
 # ABI
 def test_get_abi_file_returns_valid_file_for_dev(config):
     """
@@ -202,16 +202,16 @@ def test_get_abi_file_returns_valid_file_for_dev(config):
     """
     abi_file = config.get_abi_file()
     assert abi_file == config.FILE_ABI_DEV
-    
+
 def test_get_abi_file_raises_exception_file_missing(config):
     """
         Test get_abi that raises BridgeRelayerConfigABIFileMissing 
         when abi.json file is missing
     """
     with patch('src.relayer.config.config.get_abi_file', return_value="missing_abi_file"):
-        with pytest.raises(BridgeRelayerConfigABIFileMissing):
+        with pytest.raises(RelayerConfigABIFileMissing):
             config.get_abi(chain_id=80002)             
-    
+
 def test_get_abi_returns_valid_abi(config):
     """
         Test get_abi that returns an abi for a specific chain_id
@@ -231,7 +231,7 @@ def test_get_abi_raise_exception_with_invalid_chain_id(config):
         Test get_abi that raises BridgeRelayerConfigABIAttributeMissing with 
         invalid chain_id
     """
-    with pytest.raises(BridgeRelayerConfigABIAttributeMissing):
+    with pytest.raises(RelayerConfigABIAttributeMissing):
         config.get_abi(chain_id=777)
 
 def test_get_relayer_event_rules_raise_exception_with_invalid_event_name(config):
@@ -239,9 +239,9 @@ def test_get_relayer_event_rules_raise_exception_with_invalid_event_name(config)
         Test get_relayer_event_rules that raises 
         BridgeRelayerConfigRelayerEventRulesDataMissing with invalid event_name
     """
-    with pytest.raises(BridgeRelayerConfigEventRuleKeyError):
+    with pytest.raises(RelayerConfigEventRuleKeyError):
         config.get_relayer_event_rule(event_name="invalid_event_name")
-    
+
 def test_get_relayer_event_rules_returns_valid_event_rule(config):
     """
         Test get_relayer_event_rules that returns valid event rule
@@ -249,3 +249,72 @@ def test_get_relayer_event_rules_returns_valid_event_rule(config):
     event_rule = config.get_relayer_event_rule(event_name="OperationCreated")
     assert isinstance(event_rule, EventRuleConfig)
     assert event_rule.event_name == "OperationCreated"
+
+def test_get_relayer_event_rule_returns_empty_list(config):
+    """
+        Test get_relayer_event_rule that returns an empty list
+    """
+    with patch(
+        'src.relayer.config.config._get_bridge_relayer_config', 
+        return_value={}
+    ):
+        event_rule = config.get_relayer_events()
+        assert event_rule == []
+
+def test_get_relayer_event_rule_returns_empty_list(config):
+    """
+        Test get_relayer_event_rule that returns an empty list
+    """
+    events = {
+        "relayer_event_rules": {
+            "OperationCreated": {
+                "origin": "chainIdFrom",
+                "has_block_finality": True,
+                "depends_on": "FeesDeposited",
+            },
+            "FeesDeposited": {
+                "origin": "chainIdTo",
+                "has_block_finality": True,
+                "chain_func_name": "chainIdTo",
+                "func_name": "sendFeesLockConfirmation",
+                "depends_on": "OperationCreated",
+            },
+            "FeesDepositConfirmed": {
+                "origin": "chainIdTo",
+                "has_block_finality": False,
+                "chain_func_name": "chainIdFrom",
+                "func_name": "receiveFeesLockConfirmation",
+            },
+            "FeesLockedConfirmed": {
+                "origin": "chainIdFrom",
+                "has_block_finality": False,
+                "chain_func_name": "chainIdFrom",
+                "func_name": "confirmFeesLockedAndDepositConfirmed",
+            },
+            "FeesLockedAndDepositConfirmed": {
+                "origin": "chainIdFrom",
+                "has_block_finality": False,
+                "chain_func_name": "chainIdTo",
+                "func_name": "completeOperation",
+            },
+            "OperationFinalized": {
+                "origin": "chainIdTo",
+                "has_block_finality": False,
+                "chain_func_name": "chainIdTo",
+                "func_name": "receivedFinalizedOperation",
+            },
+        }
+    }
+    with patch(
+        'src.relayer.config.config._get_bridge_relayer_config', 
+        return_value=events
+    ):
+        event_rule = config.get_relayer_events()
+        assert event_rule == [
+            'OperationCreated',
+            'FeesDeposited',
+            'FeesDepositConfirmed',
+            'FeesLockedConfirmed',
+            'FeesLockedAndDepositConfirmed',
+            'OperationFinalized'
+        ]

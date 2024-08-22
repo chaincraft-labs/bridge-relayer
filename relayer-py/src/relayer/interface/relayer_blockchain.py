@@ -1,12 +1,12 @@
 """Interface for Bridge Relayer."""
 from abc import ABC, abstractmethod
-from typing import Any, Callable, List
+from datetime import datetime
+from typing import List, Optional
 
-from src.relayer.domain.relayer import (
+from src.relayer.domain.event import (
     BridgeTaskResult,
-)
-from src.relayer.domain.relayer import (
     BridgeTaskDTO,
+    EventDatasDTO
 )
 
 
@@ -14,47 +14,91 @@ class IRelayerBlockchain(ABC):
     """Relayer Interface for blockchain events."""
     
     @abstractmethod
-    async def get_block_number(self) -> int:
-        """Get the block number.
-
-        Returns:
-            (int): The block number
-        """
-    
-    @abstractmethod
-    def set_chain_id(self, chain_id: int):
-        """Set the blockchain id.
+    def connect_client(self, chain_id: int):
+        """Connect to the web3 client.
 
         Args:
             chain_id (int): The chain id
         """
-        
+
     @abstractmethod
     def set_event_filter(self, events: List[str]):
         """Set the event filter.
 
         Args:
             events (List[str]): The events list to filter.
-        """
-   
-    @abstractmethod
-    def listen_events(self, callback: Callable, poll_interval: int) -> Any:
-        """The blockchain event listener.
 
-        Args:
-            poll_interval int: The loop poll interval in second 
+        Raises:
+            RelayerEventsNotFound: Raise error if failed to set events
         """
-
+    
     @abstractmethod
     async def call_contract_func(
         self, 
         bridge_task_dto: BridgeTaskDTO
     ) -> BridgeTaskResult:
         """Call a contract's function.
-        
+
         Args:
             bridge_task_dto (BridgeTaskDTO): The bridge task DTO
 
         Returns:
-            BridgeTaskResult: The bridge task execution result
+            BridgeTaskTxResult: The bridge transaction result
+
+        Raises:
+            RelayerBlockchainFailedExecuteSmartContract: Raise error if failed \
+                to execute smart contract
+        """
+
+    @abstractmethod
+    def get_current_block_number(self) -> int:
+        """Get the current block number on chain.
+
+        Returns:
+            (int): The current block number
+        """
+
+    @abstractmethod
+    def scan(
+        self, 
+        start_block: int, 
+        end_block: int,
+    ) -> EventDatasDTO:
+        """Read and process events between two block numbers.
+
+        Args:
+            start_block (int): The first block to scan
+            end_block (int): The last block to scan
+
+        Returns:
+            EventDatasDTO: Events, end block
+        """
+
+    @abstractmethod
+    def client_version(self) -> str:
+        """Get the client version
+
+        Returns:
+            str: the client version
+        Raises:
+            RelayerClientVersionError: Failed to get client version
+        """
+
+    @abstractmethod
+    def get_account_address(self) -> str:
+        """Get the account address
+
+        Returns:
+            str: The account address
+        """
+
+    @abstractmethod
+    def get_block_timestamp(self, block_num: int) -> Optional[datetime]:
+        """Get Ethereum block timestamp.
+
+        Args:
+            block_num (int): The block number
+
+        Returns:
+            Optional[datetime]: The block timestamp
         """
