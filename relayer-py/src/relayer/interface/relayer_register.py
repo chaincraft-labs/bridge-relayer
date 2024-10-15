@@ -11,18 +11,18 @@ class IRelayerRegister(ABC):
         """Register the event.
 
         Args:
-            event (bytes): An event
+            event (bytes): An event.
 
         Raises:
-            BridgeRelayerRegisterEventFailed
+            RelayerRegisterEventFailed
         """
         
     @abstractmethod
     async def read_events(self, callback: Callable) -> None:
-        """Consume event tasks.
+        """Read all event tasks.
 
         Args:
-            callback (Callable): A callback function
+            callback (Callable): A callback function.
 
         Raises:
             BridgeRelayerReadEventFailed

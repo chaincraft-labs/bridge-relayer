@@ -13,25 +13,24 @@ sys.path.append(parent_dir)
 from src.relayer.application.consume_events import ConsumeEvents  # noqa: E402
 from src.relayer.provider.relayer_register_aio_pika import RelayerRegisterEvent  # noqa: E402
 from src.relayer.provider.relayer_blockchain_web3 import RelayerBlockchainProvider  # noqa: E402
-from src.relayer.provider.relayer_event_storage import EventDataStoreToFile  # noqa: E402
+from src.relayer.provider.relayer_repository_leveldb import RelayerRepositoryProvider  # noqa: E402
 
 async def consume(debug: bool = False) -> None:
     """Consume events tasks from queue."""
     log_level = 'debug' if debug else 'info'
 
     # providers (not instantiated)
-    blockchain_provider = RelayerBlockchainProvider
-    consumer_provider = RelayerRegisterEvent
-    event_datastore_provider = EventDataStoreToFile
+    relayer_blockchain_provider = RelayerBlockchainProvider
+    relayer_register_provider = RelayerRegisterEvent
+    relayer_repository_provider = RelayerRepositoryProvider
 
     # app
     await ConsumeEvents(
-        relayer_blockchain_provider=blockchain_provider,
-        relayer_consumer_provider=consumer_provider,
-        event_datastore_provider=event_datastore_provider,
+        relayer_blockchain_provider=relayer_blockchain_provider,
+        relayer_register_provider=relayer_register_provider,
+        relayer_repository_provider=relayer_repository_provider,
         log_level=log_level,
     )()
-
 
 
 class Parser:

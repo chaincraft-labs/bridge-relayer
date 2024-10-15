@@ -1,5 +1,7 @@
 [environment]
 mode = "dev"
+data_path = "data"
+repository = "bridge.dev"
 
 [relayer_blockchain]
     # Allfet local node
@@ -7,9 +9,9 @@ mode = "dev"
     rpc_url = "http://127.0.0.1:9944/"
     project_id = "{{ PROJECT_ID_440 }}"
     pk = "{{ PK_440 }}"
-    wait_block_validation = 1
-    block_validation_second_per_block = 1
-    smart_contract_address = "0xa92D0afeB8077893b16769B1BBf011509731bA49"
+    wait_block_validation = 2
+    block_validation_second_per_block = 5
+    smart_contract_address = "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
     genesis_block = 0
     client = ""
 
@@ -18,20 +20,10 @@ mode = "dev"
     rpc_url = "http://127.0.0.1:8545/"
     project_id = "{{ PROJECT_ID_1337 }}"
     pk = "{{ PK_1337 }}"
-    wait_block_validation = 1
-    block_validation_second_per_block = 5
-    smart_contract_address = "0x712516e61C8B383dF4A63CFe83d7701Bce54B03e"
-    genesis_block = 0
-    client = "middleware"
-
-    [relayer_blockchain.ChainId80002]
-    rpc_url = "https://polygon-amoy.g.alchemy.com/v2/"
-    project_id = "{{ PROJECT_ID_80002 }}"
-    pk = "{{ PK_80002 }}"
-    wait_block_validation = 6
+    wait_block_validation = 2
     block_validation_second_per_block = 12
-    smart_contract_address = "0x6dC7CfE7Ce3c4d071fABC7B616E94fBba361B212"
-    genesis_block = 8267279
+    smart_contract_address = "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+    genesis_block = 0
     client = "middleware"
 
 [relayer_register]

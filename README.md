@@ -144,38 +144,16 @@ poetry run python bin/task_listener.py --watch
 ```bash
 
 # Start a geth node
-geth --datadir . --dev --http --dev.period 12
+geth --datadir /your_data_path --dev.period 12 --http --http.corsdomain '*' --http.api web3,eth,debug,personal,net --vmdebug --dev console
 
 # Deploy 
-geth HARDHAT_NETWORK=allfeat_local node scripts/as_bridge.js --deploy gethAllfeatLocal
-
-geth HARDHAT_NETWORK=geth node scripts/as_bridge.js --deposit-fees gethAllfeatLocal
-
-geth HARDHAT_NETWORK=allfeat_local node scripts/as_bridge.js --deploy gethAllfeatLocal
-
-geth HARDHAT_NETWORK=geth node scripts/as_bridge.js --deploy gethAllfeatLocal
-
-
-geth HARDHAT_NETWORK=geth node scripts/as_bridge.js --deposit-token allfeatGethLocal
-
-geth HARDHAT_NETWORK=allfeat_local node scripts/as_bridge.js --deploy geth,allfeat_local,1337,440
-
-geth HARDHAT_NETWORK=geth node scripts/as_bridge.js --deploy geth,allfeat_local,1337,440
-
-geth HARDHAT_NETWORK=geth node scripts/as_bridge.js --test-deposit-fees
-
-geth HARDHAT_NETWORK=geth node scripts/as_bridge.js --test-deposit-token
-
-geth HARDHAT_NETWORK=geth node scripts/as_bridge.js --update-operator
-
+[See commands here](https://github.com/AlyraButerin/Allfeat-EVM-bridge-POC/blob/dev/hardhat/COMMANDS.md)
 
 ```
 
 ## Allfeat node
 
 ### Node
-
-/Users/arnaudsene/Documents/Code/blockchain/substrate/build_a_blockchain/Allfeat
 
 ```bash
 # start node

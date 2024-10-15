@@ -9,7 +9,7 @@ https://web3py.readthedocs.io/
 """
 from datetime import datetime, timezone
 import time
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from hexbytes import HexBytes
 
 from eth_account.datastructures import SignedTransaction
@@ -18,7 +18,7 @@ from eth_abi.codec import ABICodec
 from web3 import HTTPProvider, Web3
 from web3.contract.base_contract import BaseContractEvent
 from web3.contract.contract import Contract
-from web3.exceptions import BlockNotFound, ABIEventFunctionNotFound
+from web3.exceptions import BlockNotFound
 from web3._utils.events import get_event_data
 from web3._utils.filters import construct_event_filter_params
 from web3.types import (
@@ -33,30 +33,29 @@ from eth_typing import (
     Address,
 )
 
-from src.relayer.application.base_logging import RelayerLogging
-from src.relayer.application import BaseApp
-from src.relayer.config.config import get_blockchain_config, get_abi
+from src.relayer.domain.config import RelayerBlockchainConfigDTO
+from src.relayer.config.config import Config
+from src.relayer.domain.event_db import (
+    BridgeTaskActionDTO,
+    BridgeTaskTxResult,
+    EventDTO,
+    EventDataDTO,
+)
 from src.relayer.domain.exception import (
+    RelayerBlockchainBuildTxError,
+    RelayerBlockchainSendRawTxError,
+    RelayerBlockchainSignTxError,
     RelayerErrorBlockPending,
     RelayerEventsNotFound,
     RelayerFetchEventOutOfRetries,
     RelayerBlockchainFailedExecuteSmartContract,
     RelayerClientVersionError,
 )
-from src.relayer.domain.event import (
-    BridgeTaskDTO,
-    BridgeTaskTxResult,
-)
-from src.relayer.domain.event import (
-    EventDataDTO,
-    EventDatasDTO,
-    RelayerParamsDTO,
-)
 from src.relayer.interface.relayer_blockchain import IRelayerBlockchain
 from src.utils.converter import bytes_to_hex
 
 
-class RelayerBlockchainProvider(RelayerLogging, BaseApp, IRelayerBlockchain):
+class RelayerBlockchainProvider(IRelayerBlockchain):
     """Relayer blockchain provider."""
 
     def __init__(
@@ -68,7 +67,6 @@ class RelayerBlockchainProvider(RelayerLogging, BaseApp, IRelayerBlockchain):
         num_blocks_rescan_for_forks = 10,
         chunk_size_decrease: float = 0.5,
         chunk_size_increase: float = 2.0,
-        log_level: str = 'info',
     ) -> None:
         """Relayer blockchain provider.
 
@@ -82,11 +80,11 @@ class RelayerBlockchainProvider(RelayerLogging, BaseApp, IRelayerBlockchain):
             chunk_size_increase (float, optional): Chunk size increase. Defaults to 2.0.
             log_level (str): The log level. Defaults to 'info'.
         """
-        super().__init__(level=log_level)
         self.chain_id: int = None
         self.events: List[type[BaseContractEvent]] = []
         self.filters: Dict[str, Any] = {}
         self.relay_blockchain_config: Dict[str, Any] = {}
+        self.relay_blockchain_config: RelayerBlockchainConfigDTO
         self.block_timestamps: Dict[int, Any] = {}
         self.w3: Web3
         self.w3_contract: Contract
@@ -105,22 +103,23 @@ class RelayerBlockchainProvider(RelayerLogging, BaseApp, IRelayerBlockchain):
         # Factor how fast we increase chunk size if no results found
         self.chunk_size_increase = chunk_size_increase
 
+        # # Load config (singleton)
+        self.config = Config()
+
     # -------------------------------------------------------------
     # Implemented functions
     # -------------------------------------------------------------
-    def connect_client(self, chain_id: int) -> None:
+    def connect_client(self, chain_id: int):
         """Connect to the web3 client.
 
         Args:
-            chain_id (int): The chain id
+            chain_id (int): The chain id.
         """
         self.chain_id = chain_id
-        self.relay_blockchain_config = get_blockchain_config(self.chain_id)
-        self.logger.debug(
-            f"{self.Emoji.info.value}chain_id={chain_id} "
-            f"config={self.relay_blockchain_config}"
+        self.relay_blockchain_config = self.config.get_blockchain_config(
+            self.chain_id,
         )
-        
+
         self.w3: Web3 = self._set_provider()
         self.w3_contract: Contract = self._set_contract()
 
@@ -131,193 +130,45 @@ class RelayerBlockchainProvider(RelayerLogging, BaseApp, IRelayerBlockchain):
             events (List[str]): The events list to filter.
 
         Raises:
-            RelayerEventsNotFound: Raise error if failed to set events
+            RelayerEventsNotFound
         """
         try:
-            self.logger.debug(
-                f"{self.Emoji.info.value}chain_id={self.chain_id} "
-                f"events={events}"
-            )
             self.events = [self.w3_contract.events[event] for event in events]
             self.event_filter = events
 
-        except ABIEventFunctionNotFound as e:
+        except KeyError as e:
             msg = (f"Failed to set events! error={e}")
-            self.logger.debug(
-                f"{self.Emoji.fail.value}chain_id={self.chain_id} {msg}")
             raise RelayerEventsNotFound(msg)
-
-    def call_contract_func(
-        self, 
-        bridge_task_dto: BridgeTaskDTO
-    ) -> BridgeTaskTxResult:
-        """Call a contract's function.
-
-        Args:
-            bridge_task_dto (BridgeTaskDTO): The bridge task DTO
-
-        Returns:
-            BridgeTaskTxResult: The bridge transaction result
-
-        Raises:
-            RelayerBlockchainFailedExecuteSmartContract: Raise error if failed \
-                to execute smart contract
-        """
-        try:
-            id_msg = (
-                f"chain_id={self.chain_id} "
-                f"operation_hash={bridge_task_dto.operation_hash} "
-                f"func_name={bridge_task_dto.func_name} "
-                f"params={bridge_task_dto.params} "
-            )
-
-            self.logger.debug(
-                f"{self.Emoji.info.value}{id_msg}"
-                f"Call smart contract's function "
-            )
-
-            pk: str = self.relay_blockchain_config.pk
-            account: LocalAccount = self.w3.eth.account.from_key(pk)
-            self.logger.debug(
-                f"{self.Emoji.info.value}{id_msg}"
-                f"account={account.address}"
-            )
-
-            nonce: Nonce = self._get_nonce(account_address=account.address)
-            self.logger.debug(f"{self.Emoji.info.value}{id_msg}nonce={nonce}")
-
-            func: Callable = self._get_function_by_name(
-                bridge_task_dto=bridge_task_dto)
-            self.logger.debug(f"{self.Emoji.info.value}{id_msg}func={func}")
-
-            built_tx: Dict[str, Any] = self._build_tx(
-                func=func,
-                bridge_task_dto=bridge_task_dto,
-                account_address=account.address,
-                nonce=nonce
-            )
-            self.logger.debug(
-                f"{self.Emoji.info.value}{id_msg}built_tx={built_tx}")
-
-            signed_tx: SignedTransaction = self._sign_tx(
-                built_tx=built_tx, 
-                account_key=account.key
-            )
-            self.logger.debug(
-                f"{self.Emoji.info.value}{id_msg}signed_tx={signed_tx}")
-
-            tx_hash: HexBytes = self._send_raw_tx(signed_tx=signed_tx)
-            self.logger.debug(
-                f"{self.Emoji.info.value}{id_msg}tx_hash={tx_hash}")
-
-            tx_receipt: TxReceipt = self._wait_for_transaction_receipt(tx_hash)
-            self.logger.debug(
-                f"{self.Emoji.info.value}{id_msg}tx_receipt={tx_receipt}")
-
-            result = BridgeTaskTxResult(
-                tx_hash=tx_receipt.transactionHash.hex(), # type: ignore
-                block_hash=tx_receipt.blockHash.hex(), # type: ignore
-                block_number=tx_receipt.blockNumber, # type: ignore
-                gas_used=tx_receipt.gasUsed, # type: ignore
-            )
-            self.logger.debug(
-                f"{self.Emoji.info.value}{id_msg}tx_result={result}")
-            return result
-        
-        except Exception as e:
-            self.logger.debug(f"{self.Emoji.fail.value}{id_msg}error={e}")
-            raise RelayerBlockchainFailedExecuteSmartContract(e)
 
     def get_current_block_number(self) -> int:
         """Get the current block number on chain.
 
         Returns:
-            (int): The current block number
+            (int): The current block number.
         """
-        block_number: int = self.w3.eth.block_number
-        self.logger.debug(
-            f"{self.Emoji.info.value}chain_id={self.chain_id} "
-            f"block_data.number={block_number}"
-        )
-
-        return block_number
-    
-    def scan(
-        self, 
-        start_block: int, 
-        end_block: int,
-    ) -> EventDatasDTO:
-        """Read and process events between two block numbers.
-
-        Dynamically decrease the size of the chunk if the case JSON-RPC 
-        server pukes out.
-
-        Args:
-            start_block (int): The first block to scan
-            end_block (int): The last block to scan
-
-        Returns:
-            EventDatasDTO: Events, end block
-        """
-        event_datas_dto: List[EventDataDTO] = []
-        new_end_block: int = end_block
-
-        for event_type in self.events:
-
-            (
-                new_end_block, 
-                event_datas,
-            ) = self._retry_web3_call(
-                fetch_event_logs=self._fetch_event_logs,
-                event_type=event_type,
-                start_block=start_block,
-                end_block=end_block,
-                retries=self.max_request_retries,
-                delay=self.request_retry_seconds,
-            )
-
-            for event in event_datas:
-                if event is None:
-                    continue
-
-                event_data_dto = self._create_event_data_dto(event=event)
-                event_datas_dto.append(event_data_dto)
-
-        final_event_datas_dto = EventDatasDTO(
-            event_datas=event_datas_dto,
-            end_block=new_end_block,
-        )
-
-        return final_event_datas_dto
-
+        return self.w3.eth.block_number
 
     def client_version(self) -> str:
-        """Get the client version
+        """Get the client version.
 
         Returns:
-            str: the client version
+            str: the client version.
+
         Raises:
-            RelayerClientVersionError: Failed to get client version
+            RelayerClientVersionError
         """
         try:
-            client_version = self.w3.client_version
-            self.logger.debug(
-                f"{self.Emoji.info.value}chain_id={self.chain_id} "
-                f"client_version={client_version}"
-            )
-            return client_version
+            return self.w3.client_version
         
         except Exception as e:
             msg = (f"Failed to get client version! error={e}")
-            self.logger.debug(
-                f"{self.Emoji.fail.value}chain_id={self.chain_id} {msg}")
-            raise RelayerClientVersionError(e)
+            raise RelayerClientVersionError(msg)
 
     def get_account_address(self) -> str:
-        """Get the account address
+        """Get the account address.
 
         Returns:
-            str: The account address
+            str: The account address.
         """
         pk = self.relay_blockchain_config.pk
         account: LocalAccount = self.w3.eth.account.from_key(pk)
@@ -327,7 +178,7 @@ class RelayerBlockchainProvider(RelayerLogging, BaseApp, IRelayerBlockchain):
         """Get Ethereum block timestamp.
 
         Args:
-            block_num (int): The block number
+            block_num (int): The block number.
 
         Returns:
             Optional[datetime]: The block timestamp
@@ -343,58 +194,115 @@ class RelayerBlockchainProvider(RelayerLogging, BaseApp, IRelayerBlockchain):
 
             return self.block_timestamps[block_num]
         
-        except (BlockNotFound, ValueError) as e:
-            # Block was not mined yet,
-            # minor chain reorganisation?
+        except (BlockNotFound, TypeError, ValueError):
             return None
+
+    def scan(
+        self, 
+        start_block: int, 
+        end_block: int,
+    ) -> Tuple[List[EventDTO], int]:
+        """Read and process events between two block numbers.
+
+        Dynamically decrease the size of the chunk if the case JSON-RPC 
+        server pukes out.
+
+        Args:
+            start_block (int): The first block to scan
+            end_block (int): The last block to scan
+
+        Returns:
+            Tuple[List[EventDTO], int]: Events, end block
+        """
+        events_dto: List[EventDTO] = []
+        new_end_block: int = end_block
+
+        for event_type in self.events:
+            (
+                new_end_block, 
+                event_datas,
+            ) = self._retry_web3_call(
+                fetch_event_logs=self._fetch_event_logs,
+                event_type=event_type,
+                start_block=start_block,
+                end_block=end_block,
+                retries=self.max_request_retries,
+                delay=self.request_retry_seconds,
+            )
+
+            for event_data in event_datas:
+                if event_data is None:
+                    continue
+
+                event_dto = self._create_event_data_dto(event=event_data)
+                if event_dto is None:
+                    continue
+
+                events_dto.append(event_dto)
+
+        return (events_dto, new_end_block)
+
+    def call_contract_func(
+        self, 
+        bridge_task_action_dto: BridgeTaskActionDTO
+    ) -> BridgeTaskTxResult:
+        """Call a contract's function.
+
+        Args:
+            bridge_task_action_dto (BridgeTaskActionDTO): The bridge task DTO.
+
+        Returns:
+            BridgeTaskTxResult: The bridge transaction result.
+
+        Raises:
+            RelayerBlockchainFailedExecuteSmartContract
+        """
+        try:
+            pk: str = self.relay_blockchain_config.pk
+            account: LocalAccount = self.w3.eth.account.from_key(pk)
+            nonce: Nonce = self.w3.eth.get_transaction_count(
+                account=account.address
+            )
+            func: Callable = self.w3_contract.get_function_by_name(
+                bridge_task_action_dto.func_name
+            )
+            built_tx: Dict[str, Any] = self._build_tx(
+                func=func,
+                params=bridge_task_action_dto.params,
+                account_address=account.address,
+                nonce=nonce
+            )
+            signed_tx: SignedTransaction = self._sign_tx(
+                built_tx=built_tx, 
+                account_key=account.key
+            )
+            tx_hash: HexBytes = self._send_raw_tx(signed_tx=signed_tx)
+            tx_receipt: TxReceipt = self.w3.eth.wait_for_transaction_receipt(
+                tx_hash
+            )
+
+            if tx_receipt.status == 0:
+                raise RelayerBlockchainFailedExecuteSmartContract(tx_receipt)
+
+            return BridgeTaskTxResult(
+                tx_hash=tx_receipt.transactionHash.hex(), # type: ignore
+                block_hash=tx_receipt.blockHash.hex(), # type: ignore
+                block_number=tx_receipt.blockNumber, # type: ignore
+                gas_used=tx_receipt.gasUsed, # type: ignore
+                status=tx_receipt.status, # type: ignore
+            )
+        
+        except Exception as e:
+            raise RelayerBlockchainFailedExecuteSmartContract(e)
+
 
     # -------------------------------------------------------------
     # Internal functions
     # -------------------------------------------------------------
-    def _get_nonce(self, account_address: Address) -> Nonce:
-        """Get the nonce.
-
-        Args:
-            account_address (Address): The account address.
-
-        Returns:
-            Nonce (int): A nonce
-        """
-
-        nonce = self.w3.eth.get_transaction_count(account=account_address)
-        self.logger.debug(
-            f"{self.Emoji.info.value}chain_id={self.chain_id} nonce={nonce} "
-            f"address={account_address}"
-        )
-
-        return nonce
-
-    def _get_function_by_name(
-        self,
-        bridge_task_dto: BridgeTaskDTO,
-    ) -> Callable:
-        """Get the smart contract's function.
-
-        Args:
-            bridge_task_dto (BridgeTaskDTO): A bridge task DTO
-
-        Returns:
-            Callable: A smart contract's function.
-        """
-
-        func =  self.w3_contract.get_function_by_name(bridge_task_dto.func_name)
-        self.logger.debug(
-            f"{self.Emoji.info.value}chain_id={self.chain_id} "
-            f"operation_hash={bridge_task_dto.operation_hash} "
-            f"smart contract's func_name={bridge_task_dto.func_name} "
-            f"func={func}"
-        )
-        return func
-
     def _build_tx(
         self,
         func: Callable,
-        bridge_task_dto: BridgeTaskDTO,
+        params: Dict[str, Any],
         account_address: Address,
         nonce: Nonce,
     ) -> Dict[str, Any]:
@@ -402,7 +310,7 @@ class RelayerBlockchainProvider(RelayerLogging, BaseApp, IRelayerBlockchain):
 
         Args:
             func (Callable): The smart contarct's function
-            bridge_task_dto (BridgeTaskDTO): The bridge task DTO
+            params (Dict): The params
             account_address (Address):  The account address
             nonce (Nonce): The nonce (int)
 
@@ -410,32 +318,20 @@ class RelayerBlockchainProvider(RelayerLogging, BaseApp, IRelayerBlockchain):
             Dict[str, Any]: The built transaction
 
         Raises:
-            RelayerBlockchainFailedExecuteSmartContract: Raise error if failed \
+            RelayerBlockchainBuildTxError: Raise error if failed \
                 to build the transaction
         """
-        id_msg = (
-            f"chain_id={self.chain_id} "
-            f"operation_hash={bridge_task_dto.operation_hash} "
-            f"func_name={bridge_task_dto.func_name} "
-            f"params={bridge_task_dto.params} "
-            f"address={account_address} "
-        )
-        self.logger.debug(f"{self.Emoji.info.value}{id_msg}Build transaction")
-
         try:
-            built_tx = func(**bridge_task_dto.params) \
-                .build_transaction(transaction={
+            return func(**params).build_transaction(
+                transaction={
                     "from": account_address,
                     "nonce": nonce,
-                })
-            self.logger.debug(
-                f"{self.Emoji.info.value}{id_msg}built_tx={built_tx}")
-            return built_tx
+                }
+            )
         
         except Exception as e:
             msg = (f"Build transaction failed! error={e}")
-            self.logger.debug(f"{self.Emoji.fail.value}{id_msg}{msg}")
-            raise RelayerBlockchainFailedExecuteSmartContract(msg)
+            raise RelayerBlockchainBuildTxError(msg)
 
     def _sign_tx(
         self,
@@ -452,25 +348,18 @@ class RelayerBlockchainProvider(RelayerLogging, BaseApp, IRelayerBlockchain):
             SignedTransaction: The signed transaction
 
         Raises:
-            RelayerBlockchainFailedExecuteSmartContract: If failed to sign the \
+            RelayerBlockchainSignTxError: If failed to sign the \
                 transaction
         """
-
         try:
-            signed_tx = self.w3.eth.account.sign_transaction(
-                built_tx, private_key=account_key
+            return self.w3.eth.account.sign_transaction(
+                built_tx, 
+                private_key=account_key
             )
-            self.logger.debug(
-                f"{self.Emoji.info.value}chain_id={self.chain_id} "
-                f"Sign transaction built_tx={built_tx} signed_tx={signed_tx}"
-            )
-            return signed_tx
         
         except Exception as e:
             msg = (f"Failed to sign transaction! error={e}")
-            self.logger.debug(
-                f"{self.Emoji.fail.value}chain_id={self.chain_id} {msg}")
-            raise RelayerBlockchainFailedExecuteSmartContract(msg)
+            raise RelayerBlockchainSignTxError(msg)
 
     def _send_raw_tx(
         self,
@@ -485,44 +374,16 @@ class RelayerBlockchainProvider(RelayerLogging, BaseApp, IRelayerBlockchain):
             HexBytes: The transaction hash
 
         Raises:
-            RelayerBlockchainFailedExecuteSmartContract: If failed to send the \
-                raw transaction
+            RelayerBlockchainSendRawTxError
         """
         try:
-            tx_hash: HexBytes = self.w3.eth.send_raw_transaction(
-                signed_tx.rawTransaction)
-            self.logger.debug(
-                f"{self.Emoji.info.value}chain_id={self.chain_id} "
-                f"Send raw transaction signed_tx={signed_tx} tx_hash={tx_hash}"
+            return self.w3.eth.send_raw_transaction(
+                signed_tx.rawTransaction
             )
-            return tx_hash
         
         except Exception as e:
             msg = (f"Failed to send raw transaction! error={e}")
-            self.logger.debug(
-                f"{self.Emoji.fail.value}chain_id={self.chain_id} {msg}")
-            raise RelayerBlockchainFailedExecuteSmartContract(msg)
-
-    def _wait_for_transaction_receipt(
-        self,
-        tx_hash: HexBytes
-    ) -> TxReceipt:
-        """Wait for the transaction receipt.
-
-        Args:
-            tx_hash (HexBytes): The transaction hash
-
-        Returns:
-            TxReceipt: The transaction receipt
-        """
-        tx_receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
-        self.logger.debug(
-            f"{self.Emoji.info.value}chain_id={self.chain_id} "
-            f"Wait for transaction receipt for tx_hash tx_hash={tx_hash.hex()} "
-            f"tx_hash={tx_hash.hex()}"
-        )
-
-        return tx_receipt
+            raise RelayerBlockchainSendRawTxError(msg)
 
     def _set_provider(self) -> Web3:
         """Set the web3 provider.
@@ -534,38 +395,23 @@ class RelayerBlockchainProvider(RelayerLogging, BaseApp, IRelayerBlockchain):
             f"{self.relay_blockchain_config.rpc_url}"
             f"{self.relay_blockchain_config.project_id}"
         )
-        
         provider = HTTPProvider(endpoint_uri=rpc_url)
         provider.middlewares.clear() # type: ignore
         
-        w3 = Web3(provider)
+        return Web3(provider)
 
-        self.logger.debug(
-            f"{self.Emoji.info.value}chain_id={self.chain_id} "
-            f"rpc_url={rpc_url} "
-            f"provider={provider} "
-        )
-        
-        return w3
-    
     def _set_contract(self) -> Contract:
         """Set the web3 contrat instance.
 
         Returns:
             Contract: A contract instance.
         """
-        w3_contract = self.w3.eth.contract(
+        return self.w3.eth.contract(
             Web3.to_checksum_address(
                 self.relay_blockchain_config.smart_contract_address
             ),
-            abi=get_abi(self.chain_id)
+            abi=self.config.get_abi(self.chain_id)
         )
-        self.logger.debug(
-            f"{self.Emoji.info.value}chain_id={self.chain_id} "
-            f"set web3 contract instance"
-        )
-
-        return w3_contract
 
     def _fetch_event_logs(
         self,
@@ -698,13 +544,6 @@ class RelayerBlockchainProvider(RelayerLogging, BaseApp, IRelayerBlockchain):
                 # https://github.com/ethereum/go-ethereum/issues/20426
                 if i < retries - 1:
                     if end_block > 0:
-                        self.logger.debug(
-                            f"{self.Emoji.alert.value}chain_id={self.chain_id} "
-                            f"Retrying events for block range {start_block} "
-                            f"- {end_block} ({end_block-start_block}) failed with "
-                            f"error={e} , retrying in {delay} seconds"
-                        )
-
                         # Decrease the `eth_getBlocks` range
                         end_block = start_block + ((end_block - start_block) // 2)
                         # Let the JSON-RPC to recover e.g. from restart
@@ -712,24 +551,21 @@ class RelayerBlockchainProvider(RelayerLogging, BaseApp, IRelayerBlockchain):
                         continue
                 else:
                     msg = ("Fetch event error! Out of retries!")
-                    self.logger.debug(
-                        f"{self.Emoji.info.fail}chain_id={self.chain_id} {msg}")
                     raise RelayerFetchEventOutOfRetries(msg)
 
         return end_block, events
 
-    
-    def _create_event_data_dto(self, event: EventData) -> EventDataDTO:
+    def _create_event_data_dto(self, event: EventData) -> Optional[EventDTO]:
         """Create EventDataDTO
 
         Args:
             event (EventData): The event
 
+        Returns:
+            Optional[EventDTO]: EventDTO
+
         Raises:
             RelayerErrorBlockPending: 
-
-        Returns:
-            EventDataDTO: The EventDataDTO
         """
         # Integer of the log index position in the block, null when 
         # its pending
@@ -752,14 +588,14 @@ class RelayerBlockchainProvider(RelayerLogging, BaseApp, IRelayerBlockchain):
         if block_datetime is None:
             return
 
-        event_data_dto = EventDataDTO(
+        return EventDTO(
             chain_id=self.chain_id,
             event_name=event.event,
             block_number=event.blockNumber,
             tx_hash=event.transactionHash.hex(),
             log_index=event.logIndex,
             block_datetime=block_datetime,
-            data=RelayerParamsDTO(
+            data=EventDataDTO(
                 from_=event.args.params['from'],
                 to=event.args.params.to,
                 chain_id_from=event.args.params.chainIdFrom,
@@ -774,6 +610,3 @@ class RelayerBlockchainProvider(RelayerLogging, BaseApp, IRelayerBlockchain):
                 block_step=event.args.blockStep,
             ),
         )
-
-        return event_data_dto
-    

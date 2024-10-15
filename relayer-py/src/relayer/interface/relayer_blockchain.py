@@ -1,12 +1,12 @@
 """Interface for Bridge Relayer."""
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
-from src.relayer.domain.event import (
-    BridgeTaskResult,
-    BridgeTaskDTO,
-    EventDatasDTO
+from src.relayer.domain.event_db import (
+    BridgeTaskActionDTO, 
+    BridgeTaskTxResult, 
+    EventDTO
 )
 
 
@@ -18,7 +18,7 @@ class IRelayerBlockchain(ABC):
         """Connect to the web3 client.
 
         Args:
-            chain_id (int): The chain id
+            chain_id (int): The chain id.
         """
 
     @abstractmethod
@@ -29,25 +29,7 @@ class IRelayerBlockchain(ABC):
             events (List[str]): The events list to filter.
 
         Raises:
-            RelayerEventsNotFound: Raise error if failed to set events
-        """
-    
-    @abstractmethod
-    async def call_contract_func(
-        self, 
-        bridge_task_dto: BridgeTaskDTO
-    ) -> BridgeTaskResult:
-        """Call a contract's function.
-
-        Args:
-            bridge_task_dto (BridgeTaskDTO): The bridge task DTO
-
-        Returns:
-            BridgeTaskTxResult: The bridge transaction result
-
-        Raises:
-            RelayerBlockchainFailedExecuteSmartContract: Raise error if failed \
-                to execute smart contract
+            RelayerEventsNotFound
         """
 
     @abstractmethod
@@ -55,41 +37,26 @@ class IRelayerBlockchain(ABC):
         """Get the current block number on chain.
 
         Returns:
-            (int): The current block number
-        """
-
-    @abstractmethod
-    def scan(
-        self, 
-        start_block: int, 
-        end_block: int,
-    ) -> EventDatasDTO:
-        """Read and process events between two block numbers.
-
-        Args:
-            start_block (int): The first block to scan
-            end_block (int): The last block to scan
-
-        Returns:
-            EventDatasDTO: Events, end block
+            (int): The current block number.
         """
 
     @abstractmethod
     def client_version(self) -> str:
-        """Get the client version
+        """Get the client version.
 
         Returns:
-            str: the client version
+            str: the client version.
+
         Raises:
-            RelayerClientVersionError: Failed to get client version
+            RelayerClientVersionError
         """
 
     @abstractmethod
     def get_account_address(self) -> str:
-        """Get the account address
+        """Get the account address.
 
         Returns:
-            str: The account address
+            str: The account address.
         """
 
     @abstractmethod
@@ -97,8 +64,44 @@ class IRelayerBlockchain(ABC):
         """Get Ethereum block timestamp.
 
         Args:
-            block_num (int): The block number
+            block_num (int): The block number.
 
         Returns:
             Optional[datetime]: The block timestamp
+        """
+
+    @abstractmethod
+    def scan(
+        self, 
+        start_block: int, 
+        end_block: int,
+    ) -> Tuple[List[EventDTO], int]:
+        """Read and process events between two block numbers.
+
+        Dynamically decrease the size of the chunk if the case JSON-RPC 
+        server pukes out.
+
+        Args:
+            start_block (int): The first block to scan
+            end_block (int): The last block to scan
+
+        Returns:
+            Tuple[List[EventDTO], int]: Events, end block
+        """
+
+    @abstractmethod
+    def call_contract_func(
+        self, 
+        bridge_task_action_dto: BridgeTaskActionDTO
+    ) -> BridgeTaskTxResult:
+        """Call a contract's function.
+
+        Args:
+            bridge_task_action_dto (BridgeTaskActionDTO): The bridge task DTO.
+
+        Returns:
+            BridgeTaskTxResult: The bridge transaction result.
+
+        Raises:
+            RelayerBlockchainFailedExecuteSmartContract
         """

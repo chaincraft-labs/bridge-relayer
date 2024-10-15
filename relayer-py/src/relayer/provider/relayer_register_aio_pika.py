@@ -6,36 +6,39 @@ https://www.rabbitmq.com/
 
 The library used is pika
 """
+import signal
 from typing import Callable, Union
 import asyncio
 import aio_pika
 
 from src.relayer.interface.relayer_register import IRelayerRegister
-from src.relayer.config.config import get_register_config
+from src.relayer.config.config import Config
 from src.relayer.domain.exception import (
     RelayerRegisterEventFailed,
     RelayerReadEventFailed,
 )
-from src.relayer.application.base_logging import RelayerLogging
-from src.relayer.application import BaseApp
 
 
-class RelayerRegisterEvent(RelayerLogging, BaseApp, IRelayerRegister):
+class RelayerRegisterEvent(IRelayerRegister):
     """Relayer register provider
 
     RabbitMQ is used as messaging and streaming broker.
     """
 
-    def __init__(self, log_level: str = 'info',) -> None:
+    def __init__(self) -> None:
         """Init RelayerRegisterEvent.
 
         Args:
             log_level (str): The log level. Defaults to 'info'.
         """
-        super().__init__(level=log_level)
-        self.relayer_register_config = get_register_config()
+        # Load config (singleton)
+        self.config = Config()
+        self.relayer_register_config = self.config.get_register_config()
         self.queue_name: str = self.relayer_register_config.queue_name
         self.callback: Callable
+        self.stop_event = asyncio.Event()
+        self.semaphore = asyncio.Semaphore(10)
+        self.tasks = 0
 
     # ------------------------------------------------------------------
     # Implemented functions
@@ -44,57 +47,48 @@ class RelayerRegisterEvent(RelayerLogging, BaseApp, IRelayerRegister):
         """Register the event.
 
         Args:
-            event (bytes): An event
+            event (bytes): An event.
 
         Raises:
-            BridgeRelayerRegisterEventFailed
+            RelayerRegisterEventFailed
         """
-        self.logger.debug(
-            f"{self.Emoji.info.value} "
-            f"Register message to RabbitMQ "
-            f"event={event}"
-        )
-
         try:
             await self._send_message(message=event)
 
         except Exception as e:
-            msg = (
-                f"Failed to register message to RabbitMQ "
-                f"event={event}, error={e}"
-            )
-            self.logger.debug(f"{self.Emoji.fail.value} {msg}")
             raise RelayerRegisterEventFailed(e)
 
     async def read_events(self, callback: Callable) -> None:
-        """Consume event tasks.
+        """Read all event tasks.
 
         Args:
-            callback (Callable): A callback function
+            callback (Callable): A callback function.
 
         Raises:
             BridgeRelayerReadEventFailed
         """
-        self.logger.debug(
-            f"{self.Emoji.info.value} "
-            f"Read message from RabbitMQ "
-            f"callback=${callback}"
-        )
-
         try:
-            await self._consume_message(callback=callback)
+            self._callback = callback
+            loop = asyncio.get_running_loop()
+
+            # Capture the Ctrl+C signal and call shutdown
+            for sig in (signal.SIGINT, signal.SIGTERM):
+                loop.add_signal_handler(
+                    sig, 
+                    lambda sig=sig: asyncio.create_task(self.shutdown(loop, sig))
+                )
+
+            try:
+                await self._consume_message()
+            finally:
+                pass
 
         except Exception as e:
-            self.logger.debug(
-                f"{self.Emoji.fail.value} "
-                f"Failed to read message from RabbitMQ! error={e}"
-            )
             raise RelayerReadEventFailed(e)
 
     # ------------------------------------------------------------------
     # Internal functions
     # ------------------------------------------------------------------
- 
     async def _connection(self) -> aio_pika.RobustConnection:
         """Connect to RabbitMQ.
 
@@ -106,13 +100,9 @@ class RelayerRegisterEvent(RelayerLogging, BaseApp, IRelayerRegister):
         host = self.relayer_register_config.host
         port = self.relayer_register_config.port
         url = f"amqp://{user}:{password}@{host}:{port}/"
-        connection = await aio_pika.connect_robust(url)
-        return connection
+        return await aio_pika.connect(url)
 
-    async def _send_message(
-        self,
-        message: Union[str, bytes],
-    ) -> None:
+    async def _send_message(self, message: Union[str, bytes]) -> None:
         """Send a message to RabbitMQ.
 
         Args:
@@ -123,40 +113,22 @@ class RelayerRegisterEvent(RelayerLogging, BaseApp, IRelayerRegister):
         """
 
         try:
-            connection = await self._connection()
-
+            connection: aio_pika.RobustConnection = await self._connection()
             async with connection:
                 channel = await connection.channel()
-
-                # Declare queue
                 queue = await channel.declare_queue(
-                    self.queue_name, durable=True
+                    self.queue_name, 
+                    durable=True,
                 )
-
-                # Send message
                 await channel.default_exchange.publish(
                     aio_pika.Message(body=message),
                     routing_key=queue.name,
                 )
-            
-            self.logger.debug(
-                f"{self.Emoji.info.value} "
-                f"Send message to RabbitMQ "
-                f"connection={connection} "
-                f"channel={channel}"
-            )
 
-        except Exception as e:
-            self.logger.debug(
-                f"{self.Emoji.fail.value} "
-                f"Failed to send message to RabbitMQ! error={e}"
-            )
+        except Exception:
             raise
 
-    async def _consume_message(
-        self,
-        callback: Callable,
-    ) -> None:
+    async def _consume_message(self) -> None:
         """Consume event tasks.
 
         Args:
@@ -165,32 +137,45 @@ class RelayerRegisterEvent(RelayerLogging, BaseApp, IRelayerRegister):
         Raises:
             Exception
         """
-        self.logger.debug('Receive message from RabbitMQ')
-
         try:
-            self.callback = callback
-            connection = await self._connection()
-
+            connection: aio_pika.RobustConnection = await self._connection()
             async with connection:
                 channel = await connection.channel()
                 queue = await channel.declare_queue(
                     self.queue_name, 
                     durable=True
                 )
-                await queue.consume(self._callback)
+                await queue.consume(self.callback)
                 await asyncio.Future()
-
-        except Exception as e:
-            self.logger.debug(
-                f"{self.Emoji.fail.value} "
-                f"Failed to receive message from RabbitMQ! error={e}"
-            )
+        except Exception:
             raise
 
-    async def _callback(
-        self,
-        message: aio_pika.IncomingMessage
-    ) -> Union[str, bytes]:
-        
+    def stop(self):
+        """Signal the event to stop consuming messages."""
+        self.stop_event.set()
+
+    async def callback(self, message: aio_pika.IncomingMessage) -> None:
+        """Callback function to handle the received message and update a file."""
         async with message.process():
-            await self.callback(message.body)
+            try:
+                message_data = message.body
+                await self._callback(message_data)
+            except Exception:
+                return
+
+    async def shutdown(self, loop, signal=None):
+        """Cleanup tasks gracefully after receiving a signal."""
+        if signal:
+            print(f"Received exit signal {signal.name}...")
+        
+        tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+
+        print(f"Cancelling {len(tasks)} outstanding tasks")
+        for task in tasks:
+            task.cancel()
+
+        # Wait until all tasks are cancelled
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        print(f"Cancelled tasks results: {results}")
+
+        loop.stop()

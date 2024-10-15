@@ -16,6 +16,7 @@ class BaseApp:
         success = "🟢 "
         info = "🔵 "
         alert = "🟠 "
+        warn = "🟠 "
         fail = "🔴 "
         wait = "⏳ "
         emark = "❕ "

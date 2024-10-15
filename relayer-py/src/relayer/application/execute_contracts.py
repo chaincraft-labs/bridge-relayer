@@ -1,13 +1,8 @@
 """Execute smart contract function."""
 from src.relayer.application import BaseApp
 from src.relayer.application.base_logging import RelayerLogging
-from src.relayer.domain.exception import (
-    RelayerBlockchainFailedExecuteSmartContract,
-)
-from src.relayer.domain.event import (
-    BridgeTaskDTO,
-    BridgeTaskTxResult,
-)
+from src.relayer.domain.exception import RelayerBlockchainFailedExecuteSmartContract
+from src.relayer.domain.event_db import BridgeTaskActionDTO, BridgeTaskTxResult
 from src.relayer.interface.relayer_blockchain import IRelayerBlockchain
 
 
@@ -30,22 +25,22 @@ class ExecuteContracts(RelayerLogging, BaseApp):
         super().__init__(level=log_level)
         self.log_level = log_level
         self.providers = {}
-        self.rb_provider: IRelayerBlockchain = relayer_blockchain_provider
+        self.blockchain_provider: IRelayerBlockchain = relayer_blockchain_provider
 
     def __call__(
         self, 
         chain_id: int,
-        bridge_task_dto: BridgeTaskDTO
+        bridge_task_action_dto: BridgeTaskActionDTO
     ) -> None:
         """Execute the smart contract function.
 
         Args:
             chain_id (int): The chain id
-            bridge_task_dto (BridgeTaskDTO): The bridge task DTO
+            bridge_task_action_dto (BridgeTaskActionDTO): The bridge task DTO
         """
         self.call_contract_func(
             chain_id=chain_id, 
-            bridge_task_dto=bridge_task_dto,
+            bridge_task_action_dto=bridge_task_action_dto,
         )
 
     def chain_connector(self, chain_id: int) -> IRelayerBlockchain:
@@ -60,7 +55,7 @@ class ExecuteContracts(RelayerLogging, BaseApp):
         if chain_id in self.providers:
             return self.providers[chain_id]
         
-        self.providers[chain_id] = self.rb_provider(log_level=self.log_level)
+        self.providers[chain_id] = self.blockchain_provider()
         self.providers[chain_id].connect_client(chain_id=chain_id)
 
         return self.providers[chain_id]
@@ -68,13 +63,13 @@ class ExecuteContracts(RelayerLogging, BaseApp):
     def call_contract_func(
         self, 
         chain_id: int,
-        bridge_task_dto: BridgeTaskDTO,
+        bridge_task_action_dto: BridgeTaskActionDTO,
     ) -> BridgeTaskTxResult:
         """Call the smart contract's function.
 
         Args:
             chain_id (int): The chain id
-            bridge_task_dto (BridgeTaskDTO): The bridge task DTO
+            bridge_task_action_dto (BridgeTaskDTO): The bridge task DTO
 
         Returns:
             BridgeTaskTxResult: The transaction result
@@ -85,9 +80,9 @@ class ExecuteContracts(RelayerLogging, BaseApp):
         """
         id_msg = (
             f"chain_id={chain_id} "
-            f"operation_hash={bridge_task_dto.operation_hash} "
-            f"func_name={bridge_task_dto.func_name} "
-            f"params={bridge_task_dto.params} "
+            f"operation_hash={bridge_task_action_dto.operation_hash} "
+            f"func_name={bridge_task_action_dto.func_name} "
+            f"params={bridge_task_action_dto.params} "
         )
         self.logger.info(
             f"{self.Emoji.sendTx.value}{id_msg}"
@@ -96,7 +91,7 @@ class ExecuteContracts(RelayerLogging, BaseApp):
 
         try:
             tx: BridgeTaskTxResult = self.chain_connector(chain_id) \
-                .call_contract_func(bridge_task_dto=bridge_task_dto)
+                .call_contract_func(bridge_task_action_dto)
             
             self.logger.info(
                 f"{self.Emoji.success.value}{id_msg}"

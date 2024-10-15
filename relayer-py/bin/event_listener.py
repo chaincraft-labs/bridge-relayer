@@ -13,38 +13,26 @@ sys.path.append(parent_dir)
 from src.relayer.application.listen_events import ListeEvents  # noqa: E402
 from src.relayer.provider.relayer_blockchain_web3 import RelayerBlockchainProvider  # noqa: E402
 from src.relayer.provider.relayer_register_aio_pika import RelayerRegisterEvent  # noqa: E402
-from src.relayer.provider.relayer_event_storage import EventDataStoreToFile  # noqa: E402
+from src.relayer.provider.relayer_repository_leveldb import RelayerRepositoryProvider  # noqa: E402
 
 
 async def app(chain_id: int, debug: bool = False) -> None:
     log_level = 'debug' if debug else 'info'
     # providers
-    rb_provider = RelayerBlockchainProvider(log_level=log_level)
-    rr_provider = RelayerRegisterEvent(log_level=log_level)
-    es_provider = EventDataStoreToFile(log_level=log_level)
-
-    # Set event filters
-    event_filters = [
-        "OperationCreated",
-        "FeesLockedConfirmed",
-        "FeesLockedAndDepositConfirmed",
-        "FeesDeposited",
-        "FeesDepositConfirmed",
-        "OperationFinalized"
-    ]
+    relayer_blockchain_provider = RelayerBlockchainProvider()
+    relayer_register_provider = RelayerRegisterEvent()
+    relayer_repository_provider = RelayerRepositoryProvider()
 
     # Call apps
-    await ListeEvents(
+    listener =  ListeEvents(
         chain_id=chain_id,
-        event_filters=event_filters,
-        relayer_blockchain_provider=rb_provider,
-        relayer_register_provider=rr_provider,
-        event_datastore_provider=es_provider,
+        relayer_blockchain_provider=relayer_blockchain_provider,
+        relayer_register_provider=relayer_register_provider,
+        relayer_repository_provider=relayer_repository_provider,
         log_level=log_level,
-    )(as_service=True, progress_bar=False)
-
-    # Scan events
-    # await apps(as_service=True, progress_bar=False)
+    )
+    
+    await listener(as_service=True, progress_bar=False)
 
 
 class Parser:
