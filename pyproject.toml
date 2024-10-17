@@ -30,6 +30,11 @@ web3 = {extras = ["tester"], version = "^6.19.0"}
 
 [tool.poetry.group.dev.dependencies]
 pytest-cov = "^5.0.0"
+tox = "^4.22.0"
+mypy = "^1.12.0"
+flake8 = "^7.1.1"
+pydocstyle = "^6.3.0"
+ruff = "^0.6.9"
 
 [build-system]
 requires = ["poetry-core"]

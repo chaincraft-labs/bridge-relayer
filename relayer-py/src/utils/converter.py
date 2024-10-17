@@ -14,7 +14,7 @@ def _serialize_data(data: Any) -> BytesIO:
 
     Returns:
         BytesIO: The data serialized
-    """    
+    """
     pickle_data = pickle.dumps(
         data, protocol=pickle.HIGHEST_PROTOCOL)
 
@@ -46,7 +46,7 @@ def from_bytes(data: bytes) -> Any:
 
 
 def hex_to_bytes(hex_str: str) -> bytes:
-    """Convert a hex string to bytes
+    """Convert a hex string to bytes.
 
     Args:
         hex_str (str): The hex string
@@ -58,7 +58,7 @@ def hex_to_bytes(hex_str: str) -> bytes:
 
 
 def bytes_to_hex(hex_bytes: bytes) -> bytes:
-    """Convert bytes to a hex string
+    """Convert bytes to a hex string.
 
     Args:
         hex_bytes (bytes): The bytes

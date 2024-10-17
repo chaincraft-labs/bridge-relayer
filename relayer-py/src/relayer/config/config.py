@@ -10,17 +10,17 @@ from jinja2 import Template
 
 from src.relayer.domain.config import (
     EventRuleConfig,
-    RelayerBlockchainConfigDTO, 
+    RelayerBlockchainConfigDTO,
     RelayerRegisterConfigDTO,
 )
 from src.relayer.domain.exception import (
-    RelayerConfigABIAttributeMissing, 
-    RelayerConfigABIFileMissing, 
+    RelayerConfigABIAttributeMissing,
+    RelayerConfigABIFileMissing,
     RelayerConfigBlockchainDataMissing,
     RelayerConfigError,
-    RelayerConfigEventRuleKeyError, 
-    RelayerConfigRegisterDataMissing, 
-    RelayerConfigReplacePlaceholderTypeError, 
+    RelayerConfigEventRuleKeyError,
+    RelayerConfigRegisterDataMissing,
+    RelayerConfigReplacePlaceholderTypeError,
     RelayerConfigTOMLFileMissing,
 )
 
@@ -37,6 +37,7 @@ FILE_ENV_PRD = ".env.config.prod"
 # Load .env
 load_dotenv()
 
+
 def get_root_path() -> pathlib.Path:
     """Get the root path.
 
@@ -44,6 +45,7 @@ def get_root_path() -> pathlib.Path:
         pathlib.Path: The root path
     """
     return pathlib.Path(__file__).parent.parent.parent.parent
+
 
 def is_dev_env() -> bool:
     """Check if environment is dev or prod.
@@ -63,17 +65,18 @@ def load_env_file():
     else:
         load_dotenv(FILE_ENV_PRD)
 
+
 def get_toml_file() -> str:
     """Get the toml file name.
 
-    Depends on environment value set in .env 
+    Depends on environment value set in .env
         DEV_ENV=True
 
     Returns:
         str: The toml file name
     """
     load_env_file()
-    
+
     if is_dev_env():
         return FILE_TOML_DEV
     return FILE_TOML_PRD
@@ -81,8 +84,8 @@ def get_toml_file() -> str:
 
 def get_abi_file() -> str:
     """Get the abi file name.
-    
-    Depends on environment value set in .env 
+
+    Depends on environment value set in .env
         DEV_ENV=True
 
     Returns:
@@ -113,11 +116,11 @@ def get_config_content(toml_file: str) -> str:
         return config_content
     except FileNotFoundError as e:
         raise RelayerConfigTOMLFileMissing(e)
-    
-    
+
+
 def replace_placeholders(config_content: str) -> str:
     """Substitute double curly braces by values.
-    
+
     Powered by Jinja template engine.
 
     Args:
@@ -137,7 +140,7 @@ def replace_placeholders(config_content: str) -> str:
         raise RelayerConfigReplacePlaceholderTypeError(e)
 
 
-def get_bridge_relayer_config()-> Dict[str, Any]:
+def get_bridge_relayer_config() -> Dict[str, Any]:
     """Get the bridge relayer config values.
 
     Returns:
@@ -184,21 +187,34 @@ def read_abis() -> Any:
 # ---------------------------------------------------------------------------
 # Exported functions
 # ---------------------------------------------------------------------------
-class Singleton(type):
-    _instances = {}
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
-        return cls._instances[cls]
 
+
+class Singleton(type):
+    """Singleton class."""
+
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs) -> Any:
+        """Override the default `__call__` to avoid creating multiple.
+
+        Returns:
+            Any: The instance
+        """
+        if cls not in cls._instances:
+            cls._instances[cls] = super(
+                Singleton,
+                cls
+            ).__call__(*args, **kwargs)
+        return cls._instances[cls]
 
 
 class Config(metaclass=Singleton):
     """Bridge relayer config."""
 
     def __init__(self) -> None:
-        """"""
-        self.bridge_relayer_config: Dict[str, Any] = get_bridge_relayer_config()
+        """Init the bridge relayer config."""
+        self.bridge_relayer_config: Dict[str, Any] = \
+            get_bridge_relayer_config()
         self.abi: Dict[str, Any] = read_abis()
 
     def get_abi(self, chain_id: int) -> Any:
@@ -219,7 +235,7 @@ class Config(metaclass=Singleton):
             raise RelayerConfigABIAttributeMissing(e)
 
     def get_blockchain_config(
-        self, 
+        self,
         chain_id: int,
     ) -> RelayerBlockchainConfigDTO:
         """Get the bridge relayer blockchain config.
@@ -234,20 +250,20 @@ class Config(metaclass=Singleton):
             RelayerConfigBlockchainDataMissing
         """
         relayer_blockchain: Dict[str, Any] = {}
-        
+
         try:
-            for k, v in self.bridge_relayer_config['relayer_blockchain'].items():
+            for k, v in self.bridge_relayer_config['relayer_blockchain'].items():  # noqa
                 if k.lower() != f"chainid{chain_id}":
                     continue
-                
+
                 relayer_blockchain.update(v)
                 relayer_blockchain.update({"chain_id": chain_id})
                 relayer_blockchain.update(
                     {"abi": self.get_abi(chain_id=chain_id)}
                 )
-        
+
             return RelayerBlockchainConfigDTO(**relayer_blockchain)
-        except(TypeError, KeyError) as e:
+        except (TypeError, KeyError) as e:
             raise RelayerConfigBlockchainDataMissing(
                 f"chain_id={chain_id} "
                 f"_bridge_relayer_config={self.bridge_relayer_config} "
@@ -285,14 +301,14 @@ class Config(metaclass=Singleton):
         """
         try:
             data: Dict[str, Any] = {}
-        
-            for k, v in self.bridge_relayer_config['relayer_event_rules'].items():
+
+            for k, v in self.bridge_relayer_config['relayer_event_rules'].items():  # noqa
                 if event_name.lower() != k.lower():
                     continue
-                
+
                 data.update(v)
                 data.update({"event_name": event_name})
-        
+
             return EventRuleConfig(**data)
         except (KeyError, TypeError) as e:
             raise RelayerConfigEventRuleKeyError(e)
@@ -308,14 +324,14 @@ class Config(metaclass=Singleton):
         """
         try:
             events: List[str] = []
-        
+
             for k in self.bridge_relayer_config['relayer_event_rules'].keys():
                 events.append(k)
-        
+
             return events
         except (KeyError, TypeError) as e:
             raise RelayerConfigEventRuleKeyError(e)
-        
+
     def get_data_path(self) -> pathlib.Path:
         """Get the repository name."""
         data_path = self.bridge_relayer_config['environment']['data_path']

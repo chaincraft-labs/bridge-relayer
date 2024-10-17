@@ -1,5 +1,12 @@
 # Blockchain bridge relayer (POC)
 
+[![Static Badge](https://img.shields.io/badge/3.12-blue?logo=python&logoColor=white&label=%7C%20Python)](https://www.python.org/downloads/release/python-3120/)
+[![GitHub Tag](https://img.shields.io/github/v/tag/ArnaudSene/bridge-relay-poc?logo=github&label=%7C%20Tag)](https://github.com/ArnaudSene/bridge-relay-poc/releases/tag/v0.1.0) 
+[![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/ArnaudSene/bridge-relay-poc/01-deploy.yml?logo=githubactions&logoColor=white&label=%7C%20build)](https://github.com/ArnaudSene/bridge-relay-poc/actions/workflows/01-deploy.yml) 
+![Endpoint Badge](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2FArnaudSene%2Fddcf34589ce0297a4bf5ab8cd21ebbf2%2Fraw%2Fc466fd52d5c25adae282865f027c8c214e4ec760%2Fcovbadge.json&logo=pytest&logoColor=white&label=%7C%20Coverage)
+
+---
+
 A centralized blockchain bridge relayer that aims to connect two blockchains (Proof Of Concept: POC)
 
 ## Get started

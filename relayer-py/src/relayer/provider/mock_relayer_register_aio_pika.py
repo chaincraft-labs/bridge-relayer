@@ -1,5 +1,4 @@
-"""
-Provider to manage and register events.
+"""Provider to manage and register events.
 
 Events are sent to RabbitMQ, a messaging and streaming broker.
 https://www.rabbitmq.com/
@@ -14,7 +13,7 @@ from src.relayer.config.config import Config
 
 
 class RelayerRegisterProvider(IRelayerRegister):
-    """Relayer register provider
+    """Relayer register provider.
 
     RabbitMQ is used as messaging and streaming broker.
     """
@@ -35,7 +34,23 @@ class RelayerRegisterProvider(IRelayerRegister):
         self.tasks = 0
 
     async def register_event(self, event: bytes) -> None:
+        """Register the event.
+
+        Args:
+            event (bytes): An event.
+
+        Raises:
+            RelayerRegisterEventFailed
+        """
         raise NotImplementedError
 
     async def read_events(self, callback: Callable[..., Any]) -> None:
+        """Read all event tasks.
+
+        Args:
+            callback (Callable): A callback function.
+
+        Raises:
+            BridgeRelayerReadEventFailed
+        """
         raise NotImplementedError

@@ -10,9 +10,9 @@ import plyvel
 
 from src.relayer.domain.event_db import BridgeTaskDTO, EventDTO
 from src.relayer.domain.exception import (
-    RepositoryDatabaseNotProvided, 
-    RepositoryErrorOnDelete, 
-    RepositoryErrorOnGet, 
+    RepositoryDatabaseNotProvided,
+    RepositoryErrorOnDelete,
+    RepositoryErrorOnGet,
     RepositoryErrorOnSave,
 )
 from src.relayer.interface.relayer_repository import IRelayerRepository
@@ -39,12 +39,12 @@ class RelayerRepositoryProvider(IRelayerRepository):
 
         Args:
             name (str): The name of the repository to be set up.
-            verbose (bool, optional): Whether to print verbose logs. 
+            verbose (bool, optional): Whether to print verbose logs.
                 Defaults to False.
         """
         if name is None or name == "":
             raise RepositoryDatabaseNotProvided("Database name is not set")
-        
+
         if self.db is None:
             self.db = plyvel.DB(str(name), create_if_missing=True)
 
@@ -64,8 +64,8 @@ class RelayerRepositoryProvider(IRelayerRepository):
         """
         try:
             await self._save_data(
-                prefix=self.prefix_event, 
-                id=event.as_key(), 
+                prefix=self.prefix_event,
+                id=event.as_key(),
                 data=event
             )
         except Exception as e:
@@ -134,7 +134,7 @@ class RelayerRepositoryProvider(IRelayerRepository):
         """
         try:
             await self._save_data(
-                prefix=self.prefix_bridge_task, 
+                prefix=self.prefix_bridge_task,
                 id=bridge_task.as_key(),
                 data=bridge_task,
             )
@@ -154,15 +154,17 @@ class RelayerRepositoryProvider(IRelayerRepository):
         try:
             return await self._get_datas(prefix=self.prefix_bridge_task)
         except Exception as e:
-            err = f"An unexpected error occurred while getting bridge task: {e}"
+            err = (
+                f"An unexpected error occurred while getting bridge task: {e}"
+            )
             raise RepositoryErrorOnGet(err)
- 
+
     async def get_bridge_task(self, id: str) -> BridgeTaskDTO:
         """Get a bridge task.
 
         Args:
             id (str): The bridge task id.
-        
+
         Returns:
             BridgeTask: The bridge task.
 
@@ -172,7 +174,9 @@ class RelayerRepositoryProvider(IRelayerRepository):
         try:
             return await self._get_data(prefix=self.prefix_bridge_task, id=id)
         except Exception as e:
-            err = f"An unexpected error occurred while getting bridge task: {e}"
+            err = (
+                f"An unexpected error occurred while getting bridge task: {e}"
+            )
             raise RepositoryErrorOnGet(err)
 
     # -----------------------------------------------------------------
@@ -190,7 +194,7 @@ class RelayerRepositoryProvider(IRelayerRepository):
         """
         try:
             await self._save_data(
-                prefix=self.prefix_last_scanned_block, 
+                prefix=self.prefix_last_scanned_block,
                 id=chain_id,
                 data=block_numer,
             )
@@ -213,10 +217,9 @@ class RelayerRepositoryProvider(IRelayerRepository):
         Raises:
             RepositoryErrorOnGet
         """
-        
         try:
             return await self._get_data(
-                prefix=self.prefix_last_scanned_block, 
+                prefix=self.prefix_last_scanned_block,
                 id=chain_id
             )
         except Exception as e:
@@ -250,7 +253,7 @@ class RelayerRepositoryProvider(IRelayerRepository):
             List[Any]: A list of data.
         """
         return [
-            from_bytes(value) 
+            from_bytes(value)
             for key, value in self.db.iterator(prefix=prefix.encode('utf-8'))
         ]
 

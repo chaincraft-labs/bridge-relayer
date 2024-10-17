@@ -5,7 +5,7 @@ from typing import Callable
 
 class IRelayerRegister(ABC):
     """Relayer Interface for saving events as messages."""
-    
+
     @abstractmethod
     async def register_event(self, event: bytes) -> None:
         """Register the event.
@@ -16,7 +16,7 @@ class IRelayerRegister(ABC):
         Raises:
             RelayerRegisterEventFailed
         """
-        
+
     @abstractmethod
     async def read_events(self, callback: Callable) -> None:
         """Read all event tasks.

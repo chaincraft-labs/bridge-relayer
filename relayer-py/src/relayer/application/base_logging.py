@@ -7,9 +7,12 @@ current_dir: str = os.path.dirname(os.path.abspath(__file__))
 parent_dir: str = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
+
 class FixedWidthFormatter(logging.Formatter):
+    """Log formatter with fixed width fields."""
+
     def format(self, record: logging.LogRecord) -> str:
-        """Format the log message with fixed width fields
+        """Format the log message with fixed width fields.
 
         Args:
             record (LogRecord): The record to format
@@ -49,8 +52,8 @@ class RelayerLogging:
     loggers = {}
 
     def __init__(
-        self, 
-        level: str = 'INFO', 
+        self,
+        level: str = 'INFO',
         log_file: str = 'relayer',
         log_dir: str = 'data',
     ):
@@ -65,7 +68,7 @@ class RelayerLogging:
         if self.log_file in RelayerLogging.loggers:
             self.logger = RelayerLogging.loggers[self.log_file]
         else:
-            # Initialize logger with a unique name based on the class 
+            # Initialize logger with a unique name based on the class
             # #and instance id
             self.logger = logging.getLogger(
                 f"{self.__class__.__name__}_{id(self)}"
@@ -74,8 +77,9 @@ class RelayerLogging:
 
             # File handler for INFO logs (only add if not already present)
             if not any(
-                isinstance(h, logging.FileHandler) 
-                and h.baseFilename == self.log_file for h in self.logger.handlers
+                isinstance(h, logging.FileHandler)
+                and h.baseFilename == self.log_file
+                for h in self.logger.handlers
             ):
                 file_handler_info = logging.FileHandler(self.log_file)
                 file_handler_info.setLevel(logging.INFO)
@@ -84,8 +88,9 @@ class RelayerLogging:
 
             # File handler for ERROR logs (only add if not already present)
             if not any(
-                isinstance(h, logging.FileHandler) 
-                and h.baseFilename == self.log_err_file for h in self.logger.handlers
+                isinstance(h, logging.FileHandler)
+                and h.baseFilename == self.log_err_file
+                for h in self.logger.handlers
             ):
                 file_handler_error = logging.FileHandler(self.log_err_file)
                 file_handler_error.setLevel(logging.WARNING)
@@ -94,8 +99,9 @@ class RelayerLogging:
 
             # Optionally add a DEBUG log handler
             if self.level == 'DEBUG' and not any(
-                isinstance(h, logging.FileHandler) 
-                and h.baseFilename == self.log_debug_file for h in self.logger.handlers
+                isinstance(h, logging.FileHandler)
+                and h.baseFilename == self.log_debug_file
+                for h in self.logger.handlers
             ):
                 file_handler_debug = logging.FileHandler(self.log_debug_file)
                 file_handler_debug.setLevel(logging.DEBUG)
@@ -104,4 +110,3 @@ class RelayerLogging:
 
             # Save the logger in the class-level dictionary
             RelayerLogging.loggers[self.log_file] = self.logger
-            

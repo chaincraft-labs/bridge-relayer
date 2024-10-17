@@ -1,0 +1,141 @@
+name: GitHub Actions Relayer bridge
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # Install dependencies
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install tox tox-gh-actions
+
+      # Install Poetry
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
+
+      # Load cached venv if cache exists
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v3
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock', '**/pyproject.toml') }}
+          restore-keys: |
+            venv-${{ runner.os }}-${{ matrix.python-version }}-
+
+      # Run tox tests
+      - name: "Run tox for ${{ matrix.python-version }}"
+        run: |
+          poetry run tox
+
+      # Check created files
+      - name: "Check files created"
+        run: |
+          ls -ltra
+          pwd
+
+      # Upload coverage data, only in GitHub Actions (not for local act runs)
+      - name: "Upload coverage data"
+        if: ${{ !env.ACT }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: covdata-${{ matrix.python-version }}
+          path: ${{ github.workspace }}/.coverage
+          include-hidden-files: true
+          if-no-files-found: error
+
+      # Upload tox logs if tests fail
+      - name: Upload tox logs if tests fail
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tox-logs
+          path: .tox/log
+
+  coverage:
+    name: Coverage
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # Install Poetry and dependencies
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
+
+      # Load cached venv
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v3
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock', '**/pyproject.toml') }}
+
+      # Download coverage data
+      - name: Download coverage data
+        if: ${{ !env.ACT }}
+        uses: actions/download-artifact@v4
+        with:
+          name: covdata-${{ matrix.python-version }}
+
+      # Combine and calculate total coverage
+      - name: Combine
+        run: |
+          poetry run tox -e ${{ matrix.python-version }}
+          export COVERAGE=$(python -c "import json;print(json.load(open('coverage.json'))['totals']['percent_covered_display'])")
+          echo "coverage=$COVERAGE" >> $GITHUB_ENV
+          echo "### Total coverage: ${COVERAGE}%" >> $GITHUB_STEP_SUMMARY
+
+      # Create coverage badge
+      - name: Make badge
+        uses: schneegans/dynamic-badges-action@v1.7.0
+        with:
+          auth: ${{ secrets.GIST_TOKEN }}
+          gistID: ddcf34589ce0297a4bf5ab8cd21ebbf2
+          filename: covbadge.json
+          label: Coverage
+          message: ${{ env.coverage }}%
+          minColorRange: 50
+          maxColorRange: 90
+          valColorRange: ${{ env.coverage }}
+
+      - name: Get Gist URL
+        id: gist-url
+        run: |
+          GIST_ID="ddcf34589ce0297a4bf5ab8cd21ebbf2" 
+          GIST_INFO=$(curl -s -H "Authorization: token ${{ secrets.GIST_TOKEN }}" "https://api.github.com/gists/$GIST_ID")
+          GIST_URL=$(echo $GIST_INFO | jq -r '.files."covbadge.json".raw_url')
+          echo "Markdown badge :"
+          echo "![Endpoint Badge](https://img.shields.io/endpoint?url=${GIST_URL}&logo=pytest&logoColor=white&label=%7C%20Coverage)"

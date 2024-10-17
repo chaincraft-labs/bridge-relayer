@@ -49,7 +49,7 @@ class ListeEvents(RelayerLogging, BaseApp):
                 The relayer blockchain provider
             relayer_register_provider (IRelayerRegister):
                 The relayer blockchain configuration
-            relayer_repository_provider (IRelayerRepository): 
+            relayer_repository_provider (IRelayerRepository):
                 The relayer repository
             chain_id (int): The chain id
             min_scan_chunk_size (int, optional): Minimum chunk size. \
@@ -63,21 +63,25 @@ class ListeEvents(RelayerLogging, BaseApp):
         super().__init__(level=log_level)
         self.log_level = log_level
         self.chain_id: int = chain_id
-        
+
         # configurations (singleton)
         self.config = Config()
-        self.register_config: RelayerRegisterConfigDTO = self.config.get_register_config()
+        self.register_config: RelayerRegisterConfigDTO = \
+            self.config.get_register_config()
         self.blockchain_config: RelayerBlockchainConfigDTO = \
             self.config.get_blockchain_config(chain_id)
         self.event_filters: List[str] = self.config.get_relayer_events()
         data_path = self.config.get_data_path()
         repo_name = self.config.get_repository_name()
-        self.repository_name = str(data_path / f"{self.chain_id}.events.{repo_name}")
+        self.repository_name = str(
+            data_path / f"{self.chain_id}.events.{repo_name}"
+        )
 
         # providers
-        self.blockchain_provider: IRelayerBlockchain = relayer_blockchain_provider
+        self.blockchain_provider: IRelayerBlockchain = \
+            relayer_blockchain_provider
         self.register_provider: IRelayerRegister = relayer_register_provider
-        
+
         # Our JSON-RPC throttling parameters
         self.min_scan_chunk_size = min_scan_chunk_size
         self.max_scan_chunk_size = max_scan_chunk_size
@@ -95,13 +99,13 @@ class ListeEvents(RelayerLogging, BaseApp):
         as_service: bool = False,
         log_level: str = 'info',
     ) -> None:
-        """Event scanner from RPC node
+        """Event scanner from RPC node.
 
-        Assume we might have scanned the blocks all the way to the last 
-        Ethereum block that mined a few seconds before the previous scan 
+        Assume we might have scanned the blocks all the way to the last
+        Ethereum block that mined a few seconds before the previous scan
         run ended.
         Because there might have been a minor Ethereum chain reorganisations
-        since the last scan ended, we need to discard the last few blocks 
+        since the last scan ended, we need to discard the last few blocks
         from the previous scan results.
 
         Args:
@@ -131,7 +135,7 @@ class ListeEvents(RelayerLogging, BaseApp):
                     await self.repository.get_last_scanned_block(self.chain_id)
             except RepositoryErrorOnGet:
                 last_scanned_block = 0
-            
+
             start_block: int = max(
                 last_scanned_block - block_to_delete,
                 self.blockchain_config.genesis_block,
@@ -139,10 +143,10 @@ class ListeEvents(RelayerLogging, BaseApp):
 
         start = time()
         scan = self.scan
-        
-        if progress_bar: 
+
+        if progress_bar:
             scan = self.run_scan_with_progress_bar_render
-        
+
         self.show_cli_title(start_block, end_block)
         scan_as_service = True
 
@@ -158,7 +162,7 @@ class ListeEvents(RelayerLogging, BaseApp):
                 self.logger.error(f"{self.Emoji.fail.value}{msg}")
                 self.print_log("alert", msg)
                 return
-            
+
             scanned_events: List[EventDTO] = event_scan_dto.events
             total_chunks_scanned: int = event_scan_dto.chunks_scanned
             events_registered = False
@@ -166,7 +170,7 @@ class ListeEvents(RelayerLogging, BaseApp):
             for scanned_event in scanned_events:
                 if scanned_event is None:
                     continue
-                
+
                 if await self.repository.is_event_registered(scanned_event):
                     continue
 
@@ -187,7 +191,7 @@ class ListeEvents(RelayerLogging, BaseApp):
 
             try:
                 await self.repository.set_last_scanned_block(
-                    chain_id=self.chain_id, 
+                    chain_id=self.chain_id,
                     block_numer=end_block
                 )
             except RepositoryErrorOnSave:
@@ -229,7 +233,7 @@ class ListeEvents(RelayerLogging, BaseApp):
         start_block: int,
         end_block: int
     ) -> None:
-        """Print CLI title
+        """Print CLI title.
 
         Args:
             start_block (int): The first block included in the scan
@@ -239,7 +243,7 @@ class ListeEvents(RelayerLogging, BaseApp):
         blocks_to_scan = end_block - start_block
 
         self.print_log(
-            "none", 
+            "none",
             f"{"rpc_url":<{title_length}} : {self.blockchain_config.rpc_url}\n"
             f"{"client version":<{title_length}} : "
             f"{self.blockchain_provider.client_version()}\n"
@@ -254,7 +258,7 @@ class ListeEvents(RelayerLogging, BaseApp):
             f"{"end_block":<{title_length}} : {end_block}\n"
             f"{"blocks_to_scan":<{title_length}} : {blocks_to_scan}\n"
         )
-        
+
         self.print_log('main', "Waiting for events. To exit press CTRL+C")
 
     def get_suggested_scan_end_block(self) -> int:
@@ -272,8 +276,8 @@ class ListeEvents(RelayerLogging, BaseApp):
         return current_block - 1
 
     def estimate_next_chunk_size(
-        self, 
-        current_chuck_size: float, 
+        self,
+        current_chuck_size: float,
         event_found_count: int
     ) -> int:
         """Estimate the optimal chunk size.
@@ -294,7 +298,6 @@ class ListeEvents(RelayerLogging, BaseApp):
         Returns:
             int: The next chunk size
         """
-
         if event_found_count > 0:
             # When we encounter first events, reset the chunk size window
             current_chuck_size = self.min_scan_chunk_size
@@ -303,19 +306,20 @@ class ListeEvents(RelayerLogging, BaseApp):
 
         current_chuck_size = max(self.min_scan_chunk_size, current_chuck_size)
         current_chuck_size = min(self.max_scan_chunk_size, current_chuck_size)
-        return int(current_chuck_size) 
+        return int(current_chuck_size)
 
     def scan(
-        self, 
-        start_block: int, 
-        end_block: int, 
-        start_chunk_size: int = 20, 
+        self,
+        start_block: int,
+        end_block: int,
+        start_chunk_size: int = 20,
         progress_callback: Optional[Callable] = None,
     ) -> EventScanDTO:
         """Scan events from blockchain (rpc node).
 
         Args:
-            start_block (int): start_block: The first block included in the scan
+            start_block (int): start_block: The first block included
+                in the scan
             end_block (int): The last block included in the scan
             start_chunk_size (int, optional): How many blocks we try to fetch \
                 over JSON-RPC on the first attempt. Defaults to 20.
@@ -344,15 +348,15 @@ class ListeEvents(RelayerLogging, BaseApp):
 
         while current_block <= end_block:
             estimated_end_block = current_block + chunk_size
-            
+
             (
-                events_scanned, 
+                events_scanned,
                 end_block
             ) = self.blockchain_provider.scan(
-                start_block=current_block, 
+                start_block=current_block,
                 end_block=estimated_end_block,
             )
-            
+
             current_end = end_block
             events += events_scanned
             end_block_timestamp = \
@@ -360,18 +364,18 @@ class ListeEvents(RelayerLogging, BaseApp):
 
             if progress_callback is not None:
                 progress_callback(
-                    start_block=start_block, 
-                    end_block=end_block, 
-                    current_block=current_block, 
-                    current_block_timestamp=end_block_timestamp, 
-                    chunk_size=chunk_size, 
+                    start_block=start_block,
+                    end_block=end_block,
+                    current_block=current_block,
+                    current_block_timestamp=end_block_timestamp,
+                    chunk_size=chunk_size,
                     events_count=len(events_scanned)
                 )
 
-            # Try to guess how many blocks to fetch over `eth_getLogs` 
+            # Try to guess how many blocks to fetch over `eth_getLogs`
             # API next time
             chunk_size: int = self.estimate_next_chunk_size(
-                current_chuck_size=chunk_size, 
+                current_chuck_size=chunk_size,
                 event_found_count=len(events_scanned)
             )
 
@@ -384,18 +388,18 @@ class ListeEvents(RelayerLogging, BaseApp):
             chunks_scanned=total_chunks_scanned
         )
 
-
     def run_scan_with_progress_bar_render(
-        self, 
-        start_block:int,
+        self,
+        start_block: int,
         end_block: int,
         start_chunk_size: int,
     ) -> EventScanDTO:
-        """Scan and render a progress bar in the console
+        """Scan and render a progress bar in the console.
 
         Args:
             Args:
-            start_block (int): start_block: The first block included in the scan
+            start_block (int): start_block: The first block included
+                in the scan
             end_block (int): The last block included in the scan
             start_chunk_size (int, optional): How many blocks we try to fetch \
                 over JSON-RPC on the first attempt. Defaults to 20.
@@ -407,20 +411,22 @@ class ListeEvents(RelayerLogging, BaseApp):
 
         with tqdm(total=blocks_to_scan) as progress_bar:
             def _update_progress(
-                start_block: int, 
-                end_block: int, 
-                current_block: int, 
-                current_block_timestamp: Optional[datetime], 
-                chunk_size: int, 
+                start_block: int,
+                end_block: int,
+                current_block: int,
+                current_block_timestamp: Optional[datetime],
+                chunk_size: int,
                 events_count: int,
             ):
                 if current_block_timestamp:
-                    formatted_time = current_block_timestamp.strftime("%d-%m-%Y")
+                    formatted_time = \
+                        current_block_timestamp.strftime("%d-%m-%Y")
                 else:
                     formatted_time = "no block time available"
 
                 progress_bar.set_description(
-                    f"{self.Emoji.blockFinality.value}chain_id={self.chain_id} "
+                    f"{self.Emoji.blockFinality.value}"
+                    f"chain_id={self.chain_id} "
                     f"Current block: {current_block} ({formatted_time}), "
                     f"blocks in a scan batch: {chunk_size}, events "
                     f"processed in a batch {events_count}"
@@ -429,7 +435,7 @@ class ListeEvents(RelayerLogging, BaseApp):
 
             # Run the scan
             return self.scan(
-                start_block=start_block, 
+                start_block=start_block,
                 end_block=end_block,
                 start_chunk_size=start_chunk_size,
                 progress_callback=_update_progress

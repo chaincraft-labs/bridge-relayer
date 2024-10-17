@@ -1,3 +1,4 @@
+"""Entities for Relayer Config."""
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 from typing import Any, Dict, List, Optional
@@ -15,9 +16,9 @@ class EventTxDataDTO(BaseModel):
     amount: int                 # 1000000000000000
     nonce: int                  # 20
     signature_str: str          # 0x0000000000000000000000000000000000000000
-    signature_bytes: bytes      # b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+    signature_bytes: bytes      # b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'  # noqa
     operation_hash_str: str     # "0x0000000000000000000000000000000000000000"
-    operation_hash_bytes: bytes # b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+    operation_hash_bytes: bytes # b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'  # noqa
     block_step: int             # 14836
     block_datetime: datetime
     handled: Optional[str] = None
@@ -28,11 +29,18 @@ class EventTxDataDTO(BaseModel):
     )
 
     def as_key(self) -> str:
-        """Get the event key that is a concatenation of"""
+        """Get the event key that is a concatenation of the next 2 fields.
+
+            - operation_hash
+            - event_name
+
+        Returns:
+            str: The event key
+        """
         return f"{self.operation_hash_str}-{self.event_name}"
 
     def raw_params(self) -> Dict[str, Any]:
-        """Get the raw params
+        """Get the raw params.
 
         Returns:
             Dict[str, Any]: The raw params
@@ -47,9 +55,13 @@ class EventTxDataDTO(BaseModel):
             "nonce": self.nonce,
             "signature": self.signature_bytes,
         }
-    
-    def params(self) -> Dict[str, Any]:
 
+    def params(self) -> Dict[str, Any]:
+        """Get the params.
+
+        Returns:
+            Dict[str, Any]: The params
+        """
         return {
             "from": self.from_,
             "to": self.to,
@@ -70,15 +82,15 @@ class EventTxDTO(BaseModel):
     tx_hash: str
     log_index: int
     data: EventTxDataDTO
-    
+
     model_config = ConfigDict(
         from_attributes=True,
         populate_by_name=True
     )
 
     def as_key(self) -> str:
-        """Get the event key that is a concatenation of 
-          
+        """Get the key of the event transaction.
+
           - chain id
           - block number
           - tx hash
@@ -104,9 +116,9 @@ class EventDataDTO(BaseModel):
     amount: int                 # 1000000000000000
     nonce: int                  # 20
     signature_str: str          # 0x0000000000000000000000000000000000000000
-    signature_bytes: bytes      # b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+    signature_bytes: bytes      # b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'  # noqa
     operation_hash_str: str     # "0x0000000000000000000000000000000000000000"
-    operation_hash_bytes: bytes # b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+    operation_hash_bytes: bytes # b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'  # noqa
     block_step: int             # 14836
 
     model_config = ConfigDict(
@@ -115,7 +127,7 @@ class EventDataDTO(BaseModel):
     )
 
     def raw_params(self) -> Dict[str, Any]:
-        """Get the raw params
+        """Get the raw params.
 
         Returns:
             Dict[str, Any]: The raw params
@@ -130,9 +142,13 @@ class EventDataDTO(BaseModel):
             "nonce": self.nonce,
             "signature": self.signature_bytes,
         }
-    
-    def params(self) -> Dict[str, Any]:
 
+    def params(self) -> Dict[str, Any]:
+        """Get the params of the event data.
+
+        Returns:
+            Dict[str, Any]: The params.
+        """
         return {
             "from": self.from_,
             "to": self.to,
@@ -147,7 +163,7 @@ class EventDataDTO(BaseModel):
 
 class EventDTO(BaseModel):
     """Event."""
-    
+
     chain_id: int
     event_name: str
     block_number: int
@@ -156,15 +172,15 @@ class EventDTO(BaseModel):
     block_datetime: datetime
     handled: Optional[str] = None
     data: EventDataDTO
-    
+
     model_config = ConfigDict(
         from_attributes=True,
         populate_by_name=True
     )
 
     def as_key(self) -> str:
-        """Get the event key that is a concatenation of 
-          
+        """Get the key of the event.
+
           - block number
           - tx hash
           - log index
@@ -191,7 +207,7 @@ class EventScanDTO(BaseModel):
 
 class BridgeTaskDTO(BaseModel):
     """Bridge Task."""
-    
+
     chain_id: int
     block_number: int
     tx_hash: str
@@ -207,10 +223,21 @@ class BridgeTaskDTO(BaseModel):
     )
 
     def as_key(self) -> str:
+        """Get the event key of the bridge task.
+
+        Returns:
+            str: The event key of the bridge task
+        """
         return f"{self.operation_hash}-{self.event_name}"
-    
-    def as_id(self) -> str: 
+
+    def as_id(self) -> str:
+        """Get the id of the bridge task.
+
+        Returns:
+            str: The id of the bridge task
+        """
         return f"{self.block_number}-{self.tx_hash}-{self.log_index}"
+
 
 class BridgeTaskActionDTO(BaseModel):
     """DTO for blockchain bridge relayer contract's function."""

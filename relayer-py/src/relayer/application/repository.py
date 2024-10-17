@@ -2,7 +2,10 @@
 
 
 from src.relayer.domain.event_db import BridgeTaskDTO, EventDTO
-from src.relayer.domain.exception import RepositoryErrorOnGet, RepositoryErrorOnSave
+from src.relayer.domain.exception import (
+    RepositoryErrorOnGet,
+    RepositoryErrorOnSave
+)
 from src.relayer.interface.relayer_repository import IRelayerRepository
 from src.relayer.application import BaseApp
 from src.relayer.application.base_logging import RelayerLogging
@@ -19,21 +22,32 @@ class Repository(RelayerLogging, BaseApp):
         super().__init__(level="INFO")
         # providers
         self.provider: IRelayerRepository = repository_provider
-    
+
     async def setup(self, repository_name: str) -> None:
-        """Setup the repository.
-        
+        """Configure the repository.
+
         Args:
             repository_name (str): The name of the repository to be set up.
         """
         await self.provider.setup(name=str(repository_name))
 
     async def get_last_scanned_block(self, chain_id: int):
+        """Get the last scanned block number.
+
+        Args:
+            chain_id (int): The chain id
+
+        Returns:
+            _type_: The last scanned block number
+
+        Raises:
+            RepositoryErrorOnGet
+        """
         try:
             return await self.provider.get_last_scanned_block(chain_id)
         except RepositoryErrorOnGet:
             return 0
-        
+
     async def set_last_scanned_block(self, chain_id: int, block_numer: int):
         """Set the last scanned block number.
 
@@ -51,11 +65,11 @@ class Repository(RelayerLogging, BaseApp):
             )
         except RepositoryErrorOnSave:
             raise
-    
+
     async def set_event_as_registered(self, event: EventDTO):
         """Set the event as registered.
 
-            Once an event has been scanned it has to be registered to be 
+            Once an event has been scanned it has to be registered to be
             handled.
 
         Args:
@@ -119,7 +133,7 @@ class Repository(RelayerLogging, BaseApp):
 
         except RepositoryErrorOnGet:
             return False
-        
+
     async def store_event(self, event: EventDTO) -> bool:
         """Store event in the repository.
 
@@ -133,7 +147,7 @@ class Repository(RelayerLogging, BaseApp):
 
         if not await self.is_event_stored(event):
             new_event = True
-            
+
             self.logger.info(
                 f"{self.Emoji.info.value}"
                 f"chain_id={event.chain_id} "
@@ -143,13 +157,13 @@ class Repository(RelayerLogging, BaseApp):
 
             await self.provider.save_event(event=event)
         return new_event
-    
+
     async def get_bridge_task(self, id: str) -> BridgeTaskDTO:
         """Get the bridge task.
 
         Args:
             id (str): The bridge task id
-        
+
         Returns:
             BridgeTask: The bridge task
 
@@ -160,7 +174,7 @@ class Repository(RelayerLogging, BaseApp):
             return await self.provider.get_bridge_task(id=id)
         except RepositoryErrorOnGet:
             raise
-    
+
     async def get_bridge_tasks(self) -> BridgeTaskDTO:
         """Get all bridges tasks.
 
@@ -174,7 +188,7 @@ class Repository(RelayerLogging, BaseApp):
             return await self.provider.get_bridge_tasks()
         except RepositoryErrorOnGet:
             raise
-    
+
     async def save_event(self, event: EventDTO):
         """Save an event.
 
@@ -188,7 +202,7 @@ class Repository(RelayerLogging, BaseApp):
             await self.provider.save_event(event=event)
         except RepositoryErrorOnSave:
             raise
-    
+
     async def save_bridge_task(self, bridge_task: BridgeTaskDTO):
         """Save a bridge task.
 

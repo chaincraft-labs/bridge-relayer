@@ -1,5 +1,4 @@
-"""
-Provider to manage and register events.
+"""Provider to manage and register events.
 
 Events are sent to RabbitMQ, a messaging and streaming broker.
 https://www.rabbitmq.com/
@@ -20,7 +19,7 @@ from src.relayer.domain.exception import (
 
 
 class RelayerRegisterEvent(IRelayerRegister):
-    """Relayer register provider
+    """Relayer register provider.
 
     RabbitMQ is used as messaging and streaming broker.
     """
@@ -74,8 +73,10 @@ class RelayerRegisterEvent(IRelayerRegister):
             # Capture the Ctrl+C signal and call shutdown
             for sig in (signal.SIGINT, signal.SIGTERM):
                 loop.add_signal_handler(
-                    sig, 
-                    lambda sig=sig: asyncio.create_task(self.shutdown(loop, sig))
+                    sig,
+                    lambda sig=sig: asyncio.create_task(
+                        self.shutdown(loop, sig)
+                    )
                 )
 
             try:
@@ -111,13 +112,12 @@ class RelayerRegisterEvent(IRelayerRegister):
         Raises:
             Exception
         """
-
         try:
             connection: aio_pika.RobustConnection = await self._connection()
             async with connection:
                 channel = await connection.channel()
                 queue = await channel.declare_queue(
-                    self.queue_name, 
+                    self.queue_name,
                     durable=True,
                 )
                 await channel.default_exchange.publish(
@@ -142,7 +142,7 @@ class RelayerRegisterEvent(IRelayerRegister):
             async with connection:
                 channel = await connection.channel()
                 queue = await channel.declare_queue(
-                    self.queue_name, 
+                    self.queue_name,
                     durable=True
                 )
                 await queue.consume(self.callback)
@@ -155,7 +155,7 @@ class RelayerRegisterEvent(IRelayerRegister):
         self.stop_event.set()
 
     async def callback(self, message: aio_pika.IncomingMessage) -> None:
-        """Callback function to handle the received message and update a file."""
+        """Process the received message and update a file."""
         async with message.process():
             try:
                 message_data = message.body
@@ -167,8 +167,10 @@ class RelayerRegisterEvent(IRelayerRegister):
         """Cleanup tasks gracefully after receiving a signal."""
         if signal:
             print(f"Received exit signal {signal.name}...")
-        
-        tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+
+        tasks = [
+            t for t in asyncio.all_tasks() if t is not asyncio.current_task()
+        ]
 
         print(f"Cancelling {len(tasks)} outstanding tasks")
         for task in tasks:

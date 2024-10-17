@@ -4,15 +4,15 @@ from datetime import datetime
 from typing import List, Optional, Tuple
 
 from src.relayer.domain.event_db import (
-    BridgeTaskActionDTO, 
-    BridgeTaskTxResult, 
+    BridgeTaskActionDTO,
+    BridgeTaskTxResult,
     EventDTO
 )
 
 
 class IRelayerBlockchain(ABC):
     """Relayer Interface for blockchain events."""
-    
+
     @abstractmethod
     def connect_client(self, chain_id: int):
         """Connect to the web3 client.
@@ -72,13 +72,13 @@ class IRelayerBlockchain(ABC):
 
     @abstractmethod
     def scan(
-        self, 
-        start_block: int, 
+        self,
+        start_block: int,
         end_block: int,
     ) -> Tuple[List[EventDTO], int]:
         """Read and process events between two block numbers.
 
-        Dynamically decrease the size of the chunk if the case JSON-RPC 
+        Dynamically decrease the size of the chunk if the case JSON-RPC
         server pukes out.
 
         Args:
@@ -91,7 +91,7 @@ class IRelayerBlockchain(ABC):
 
     @abstractmethod
     def call_contract_func(
-        self, 
+        self,
         bridge_task_action_dto: BridgeTaskActionDTO
     ) -> BridgeTaskTxResult:
         """Call a contract's function.

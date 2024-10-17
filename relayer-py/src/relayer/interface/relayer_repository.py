@@ -1,3 +1,4 @@
+"""Interface for repository."""
 from abc import ABC, abstractmethod
 from typing import List
 
@@ -14,7 +15,7 @@ class IRelayerRepository(ABC):
 
         Args:
             name (str): The name of the repository to be set up.
-            verbose (bool, optional): Whether to print verbose logs. 
+            verbose (bool, optional): Whether to print verbose logs.
                 Defaults to False.
         """
 
@@ -99,7 +100,7 @@ class IRelayerRepository(ABC):
 
         Args:
             id (str): The bridge task id.
-        
+
         Returns:
             BridgeTask: The bridge task.
 

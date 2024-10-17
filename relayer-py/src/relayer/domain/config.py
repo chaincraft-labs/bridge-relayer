@@ -6,7 +6,7 @@ from typing import Any, Optional
 @dataclass
 class RelayerBlockchainConfigDTO:
     """Relayer blockchain config DTO."""
-    
+
     chain_id: int
     rpc_url: str
     project_id: str
@@ -17,14 +17,20 @@ class RelayerBlockchainConfigDTO:
     genesis_block: int
     abi: Any
     client: str
-    
+
     def __str__(self) -> str:
+        """Get the string representation of the object.
+
+        Returns:
+            str: The string representation of the object.
+        """
         return f"ChainId{self.chain_id}"
-    
-    
+
+
 @dataclass
 class RelayerRegisterConfigDTO:
     """Relayer register config DTO."""
+
     host: str
     port: int
     user: str

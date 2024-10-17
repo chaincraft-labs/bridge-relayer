@@ -30,7 +30,6 @@ class BaseApp:
         violet = "🟣 "
         red = "🔴 "
 
-
     def print_log(self, status: str, message: str):
         """Print log.
 
@@ -39,4 +38,3 @@ class BaseApp:
             message (str): The message
         """
         print(f"{self.Emoji[status].value}{message}")
-

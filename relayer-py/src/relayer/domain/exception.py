@@ -7,6 +7,7 @@ class RelayerException(Exception):
 # -----------------------------------------------------------------------
 # Configuration
 
+
 class RelayerConfigError(RelayerException):
     """Raise when no config data found."""
 
@@ -41,6 +42,7 @@ class RelayerConfigEventRuleKeyError(RelayerException):
 # -----------------------------------------------------------------------
 # Blockchain / web3
 
+
 class RelayerEventsNotFound(RelayerException):
     """Raise when events not found."""
 
@@ -50,7 +52,10 @@ class RelayerErrorBlockPending(RelayerException):
 
 
 class RelayerFetchEventOutOfRetries(RelayerException):
-    """Raise when max retries has been reach while fetchin event data from RPC."""
+    """Raised when the maximum number of retries is reached.
+
+    While fetching event data from RPC.
+    """
 
 
 class RelayerEventScanFailed(RelayerException):
@@ -58,6 +63,7 @@ class RelayerEventScanFailed(RelayerException):
 
 # -----------------------------------------------------------------------
 # Register events
+
 
 class RelayerRegisterEventFailed(RelayerException):
     """Raise when register event failed."""
@@ -68,15 +74,19 @@ class RelayerReadEventFailed(RelayerException):
 
 
 # -----------------------------------------------------------------------
-# Event Converter 
+# Event Converter
+
+
 class EventConverterTypeError(RelayerException):
     """Raise when trying to create an EventDTO from event."""
 
 
 # -----------------------------------------------------------------------
 # Consumer / Execute smart contract function
+
+
 class RelayerBlockFinalityTimeExceededError(RelayerException):
-    """Raise when The function has exceeded the allocated time for processing."""
+    """Raise when The function has exceeded the allocated time."""
 
 
 class RelayerBlockchainBuildTxError(RelayerException):
@@ -117,6 +127,7 @@ class RelayerBridgeTaskInvalidStatus(RelayerException):
 # -----------------------------------------------------------------------
 #  Repository
 
+
 class RepositoryDatabaseNotProvided(RelayerException):
     """Raise when db is not provided."""
 
@@ -126,15 +137,17 @@ class RepositoryErrorOnSave(RelayerException):
 
 
 class RepositoryErrorOnGet(RelayerException):
-    """Raise when cannot be get data"""
+    """Raise when cannot be get data."""
 
 
 class RepositoryErrorOnDelete(RelayerException):
-    """Raise when cannot be delete data"""
+    """Raise when cannot be delete data."""
+
 
 # -----------------------------------------------------------------------
 # Event
- 
+
+
 class RepositoryErrorSetEventAsRegistered(RelayerException):
     """Raise when cannot set event as registered."""
 
@@ -153,4 +166,3 @@ class RepositoryStateEmptyOrNotLoaded(RelayerException):
 
 class RepositoryLastScannedBlockInvalid(RelayerException):
     """Raise when the last scanned block is invalid."""
-    

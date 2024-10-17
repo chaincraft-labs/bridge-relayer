@@ -1,5 +1,5 @@
-"""
-Provider to connect to RPC node 
+"""Provider to connect to RPC node.
+
 - scan events
 - execute smart contracts
 
@@ -64,20 +64,27 @@ class RelayerBlockchainProvider(IRelayerBlockchain):
         max_scan_chunk_size: int = 10000,
         max_request_retries: int = 30,
         request_retry_seconds: float = 3.0,
-        num_blocks_rescan_for_forks = 10,
+        num_blocks_rescan_for_forks: int = 10,
         chunk_size_decrease: float = 0.5,
         chunk_size_increase: float = 2.0,
     ) -> None:
         """Relayer blockchain provider.
 
         Args:
-            min_scan_chunk_size (int, optional): Minimum chunk size. Defaults to 10.
-            max_scan_chunk_size (int, optional): Maximum chunk size. Defaults to 10000.
-            max_request_retries (int, optional): Maximum number of retries. Defaults to 30.
-            request_retry_seconds (float, optional): Request retry seconds. Defaults to 3.0.
-            num_blocks_rescan_for_forks (int, optional): Number of blocks to rescan for forks. Defaults to 10.
-            chunk_size_decrease (float, optional): Chunk size decrease. Defaults to 0.5.
-            chunk_size_increase (float, optional): Chunk size increase. Defaults to 2.0.
+            min_scan_chunk_size (int, optional): Minimum chunk size.
+                Defaults to 10.
+            max_scan_chunk_size (int, optional): Maximum chunk size.
+                Defaults to 10000.
+            max_request_retries (int, optional): Maximum number of retries.
+                Defaults to 30.
+            request_retry_seconds (float, optional): Request retry seconds.
+                Defaults to 3.0.
+            num_blocks_rescan_for_forks (int, optional): Number of blocks to
+                rescan for forks. Defaults to 10.
+            chunk_size_decrease (float, optional): Chunk size decrease.
+                Defaults to 0.5.
+            chunk_size_increase (float, optional): Chunk size increase.
+                Defaults to 2.0.
             log_level (str): The log level. Defaults to 'info'.
         """
         self.chain_id: int = None
@@ -90,7 +97,8 @@ class RelayerBlockchainProvider(IRelayerBlockchain):
         self.w3_contract: Contract
 
         # Our JSON-RPC throttling parameters
-        self.min_scan_chunk_size = min_scan_chunk_size  # 12 s/block = 120 seconds period
+        # 12 s/block = 120 seconds period
+        self.min_scan_chunk_size = min_scan_chunk_size
         self.max_scan_chunk_size = max_scan_chunk_size
         self.max_request_retries = max_request_retries
         self.request_retry_seconds = request_retry_seconds
@@ -159,7 +167,7 @@ class RelayerBlockchainProvider(IRelayerBlockchain):
         """
         try:
             return self.w3.client_version
-        
+
         except Exception as e:
             msg = (f"Failed to get client version! error={e}")
             raise RelayerClientVersionError(msg)
@@ -188,23 +196,23 @@ class RelayerBlockchainProvider(IRelayerBlockchain):
 
             if block_num not in self.block_timestamps:
                 self.block_timestamps[block_num] = datetime.fromtimestamp(
-                    timestamp=block_info["timestamp"], 
+                    timestamp=block_info["timestamp"],
                     tz=timezone.utc
                 )
 
             return self.block_timestamps[block_num]
-        
+
         except (BlockNotFound, TypeError, ValueError):
             return None
 
     def scan(
-        self, 
-        start_block: int, 
+        self,
+        start_block: int,
         end_block: int,
     ) -> Tuple[List[EventDTO], int]:
         """Read and process events between two block numbers.
 
-        Dynamically decrease the size of the chunk if the case JSON-RPC 
+        Dynamically decrease the size of the chunk if the case JSON-RPC
         server pukes out.
 
         Args:
@@ -219,7 +227,7 @@ class RelayerBlockchainProvider(IRelayerBlockchain):
 
         for event_type in self.events:
             (
-                new_end_block, 
+                new_end_block,
                 event_datas,
             ) = self._retry_web3_call(
                 fetch_event_logs=self._fetch_event_logs,
@@ -243,7 +251,7 @@ class RelayerBlockchainProvider(IRelayerBlockchain):
         return (events_dto, new_end_block)
 
     def call_contract_func(
-        self, 
+        self,
         bridge_task_action_dto: BridgeTaskActionDTO
     ) -> BridgeTaskTxResult:
         """Call a contract's function.
@@ -273,7 +281,7 @@ class RelayerBlockchainProvider(IRelayerBlockchain):
                 nonce=nonce
             )
             signed_tx: SignedTransaction = self._sign_tx(
-                built_tx=built_tx, 
+                built_tx=built_tx,
                 account_key=account.key
             )
             tx_hash: HexBytes = self._send_raw_tx(signed_tx=signed_tx)
@@ -285,20 +293,20 @@ class RelayerBlockchainProvider(IRelayerBlockchain):
                 raise RelayerBlockchainFailedExecuteSmartContract(tx_receipt)
 
             return BridgeTaskTxResult(
-                tx_hash=tx_receipt.transactionHash.hex(), # type: ignore
-                block_hash=tx_receipt.blockHash.hex(), # type: ignore
-                block_number=tx_receipt.blockNumber, # type: ignore
-                gas_used=tx_receipt.gasUsed, # type: ignore
-                status=tx_receipt.status, # type: ignore
+                tx_hash=tx_receipt.transactionHash.hex(),  # type: ignore
+                block_hash=tx_receipt.blockHash.hex(),  # type: ignore
+                block_number=tx_receipt.blockNumber,  # type: ignore
+                gas_used=tx_receipt.gasUsed,  # type: ignore
+                status=tx_receipt.status,  # type: ignore
             )
-        
+
         except Exception as e:
             raise RelayerBlockchainFailedExecuteSmartContract(e)
-
 
     # -------------------------------------------------------------
     # Internal functions
     # -------------------------------------------------------------
+
     def _build_tx(
         self,
         func: Callable,
@@ -328,7 +336,7 @@ class RelayerBlockchainProvider(IRelayerBlockchain):
                     "nonce": nonce,
                 }
             )
-        
+
         except Exception as e:
             msg = (f"Build transaction failed! error={e}")
             raise RelayerBlockchainBuildTxError(msg)
@@ -353,10 +361,10 @@ class RelayerBlockchainProvider(IRelayerBlockchain):
         """
         try:
             return self.w3.eth.account.sign_transaction(
-                built_tx, 
+                built_tx,
                 private_key=account_key
             )
-        
+
         except Exception as e:
             msg = (f"Failed to sign transaction! error={e}")
             raise RelayerBlockchainSignTxError(msg)
@@ -380,7 +388,7 @@ class RelayerBlockchainProvider(IRelayerBlockchain):
             return self.w3.eth.send_raw_transaction(
                 signed_tx.rawTransaction
             )
-        
+
         except Exception as e:
             msg = (f"Failed to send raw transaction! error={e}")
             raise RelayerBlockchainSendRawTxError(msg)
@@ -396,8 +404,8 @@ class RelayerBlockchainProvider(IRelayerBlockchain):
             f"{self.relay_blockchain_config.project_id}"
         )
         provider = HTTPProvider(endpoint_uri=rpc_url)
-        provider.middlewares.clear() # type: ignore
-        
+        provider.middlewares.clear()  # type: ignore
+
         return Web3(provider)
 
     def _set_contract(self) -> Contract:
@@ -424,7 +432,7 @@ class RelayerBlockchainProvider(IRelayerBlockchain):
         This method is detached from any contract instance.
 
         This is a stateless method, as opposed to create_filter.
-        It can be safely called against nodes which do not provide 
+        It can be safely called against nodes which do not provide
         `eth_newFilter` API, like Infura.
 
         Args:
@@ -447,24 +455,26 @@ class RelayerBlockchainProvider(IRelayerBlockchain):
         # the contract that uses the ABI,
         # it might have Solidity ABI encoding v1 or v2.
         # We just assume the default that you set on Web3 object here.
-        # More information here https://eth-abi.readthedocs.io/en/latest/index.html
+        # More information here
+        # https://eth-abi.readthedocs.io/en/latest/index.html
         codec: ABICodec = self.w3.codec
 
         # Here we need to poke a bit into Web3 internals, as this
         # functionality is not exposed by default.
-        # Construct JSON-RPC raw filter presentation based on human readable Python descriptions
+        # Construct JSON-RPC raw filter presentation based on human readable
+        # Python descriptions
         # Namely, convert event names to their keccak signatures
         # More information here:
         # https://github.com/ethereum/web3.py/blob/e176ce0793dafdd0573acc8d4b76425b6eb604ca/web3/_utils/filters.py#L71
-        
+
         # e.g: event_filter_params
         # {
-        #   'topics': ['0x2089bed5ec297eb42b3bbdbff2a65a604959bd7c9799781313f1f6c62f8ae333'], 
-        #   'fromBlock': 6190119, 
+        #   'topics': ['0x2089bed5ec297eb42b3bbdbff2a65a604959bd7c9799781313f1f6c62f8ae333'],  # noqa
+        #   'fromBlock': 6190119,
         #   'toBlock': 6190139
         # }
         (
-            data_filter_set, 
+            data_filter_set,
             event_filter_params,
         ) = construct_event_filter_params(
             event_abi=abi,
@@ -483,12 +493,13 @@ class RelayerBlockchainProvider(IRelayerBlockchain):
         # Convert raw binary data to Python proxy objects as described by ABI
         event_datas: List[EventData] = []
         for log in logs:
-            # Convert raw JSON-RPC log result to human readable event by using ABI data
+            # Convert raw JSON-RPC log result to human readable event by
+            # using ABI data
             # More information how process_log works here
-            # https://github.com/ethereum/web3.py/blob/fbaf1ad11b0c7fac09ba34baff2c256cffe0a148/web3/_utils/events.py#L200
+            # https://github.com/ethereum/web3.py/blob/fbaf1ad11b0c7fac09ba34baff2c256cffe0a148/web3/_utils/events.py#L200  # noqa
             event_data: EventData = get_event_data(
-                abi_codec=codec, 
-                event_abi=abi, 
+                abi_codec=codec,
+                event_abi=abi,
                 log_entry=log
             )
 
@@ -499,56 +510,59 @@ class RelayerBlockchainProvider(IRelayerBlockchain):
         self,
         fetch_event_logs: Callable,
         event_type: type[BaseContractEvent],
-        start_block: int, 
-        end_block: int, 
-        retries: int, 
+        start_block: int,
+        end_block: int,
+        retries: int,
         delay: float
     ) -> tuple[int, List[EventData]]:
-        """A custom retry loop to throttle down block range.
+        """Retry loop to throttle down block range.
 
-        If our JSON-RPC server cannot serve all incoming `eth_getLogs` 
+        If our JSON-RPC server cannot serve all incoming `eth_getLogs`
         in a single request,
         we retry and throttle down block range for every retry.
 
-        For example, Go Ethereum does not indicate what is an acceptable 
+        For example, Go Ethereum does not indicate what is an acceptable
         response size.
-        It just fails on the server-side with a "context was cancelled" warning.
+        It just fails on the server-side with a "context was cancelled"
+        warning.
 
         Args:
-            fetch_event_logs (Callable): A callable that triggers Ethereum JSON-RPC, 
-                as fetch_event_logs(event_type, start_block, end_block)
+            fetch_event_logs (Callable): A callable that triggers Ethereum
+            JSON-RPC, as fetch_event_logs(event_type, start_block, end_block)
+            event_type (type[BaseContractEvent]): Event type
             start_block (int): The initial start block of the block range
             end_block (int): The initial end block of the block range
             retries (int): How many times we retry
             delay (float): Time to sleep between retries
 
         Returns:
-            tuple[int, List[EventData]]: _description_
+            tuple[int, List[EventData]]: End block, events
         """
         events: List[EventData]
         for i in range(retries):
             try:
                 events: List[EventData] = fetch_event_logs(
                     event_type=event_type,
-                    from_block=start_block, 
+                    from_block=start_block,
                     to_block=end_block,
                 )
 
                 break
-            
-            except Exception as e:
-                # Assume this is HTTPConnectionPool(host='localhost', port=8545): 
+
+            except Exception:
+                # Assume this is HTTPConnectionPool(host='localhost', port=8545):  # noqa
                 # Read timed out. (read timeout=10)
-                # from Go Ethereum. This translates to the error 
+                # from Go Ethereum. This translates to the error
                 # "context was cancelled" on the server side:
                 # https://github.com/ethereum/go-ethereum/issues/20426
                 if i < retries - 1:
-                    if end_block > 0:
-                        # Decrease the `eth_getBlocks` range
-                        end_block = start_block + ((end_block - start_block) // 2)
-                        # Let the JSON-RPC to recover e.g. from restart
-                        time.sleep(delay)
+                    if end_block < 0:
                         continue
+                    # Decrease the `eth_getBlocks` range
+                    end_block = start_block + ((end_block - start_block) // 2)
+                    # Let the JSON-RPC to recover e.g. from restart
+                    time.sleep(delay)
+                    continue
                 else:
                     msg = ("Fetch event error! Out of retries!")
                     raise RelayerFetchEventOutOfRetries(msg)
@@ -556,7 +570,7 @@ class RelayerBlockchainProvider(IRelayerBlockchain):
         return end_block, events
 
     def _create_event_data_dto(self, event: EventData) -> Optional[EventDTO]:
-        """Create EventDataDTO
+        """Create EventDataDTO.
 
         Args:
             event (EventData): The event
@@ -565,9 +579,9 @@ class RelayerBlockchainProvider(IRelayerBlockchain):
             Optional[EventDTO]: EventDTO
 
         Raises:
-            RelayerErrorBlockPending: 
+            RelayerErrorBlockPending:
         """
-        # Integer of the log index position in the block, null when 
+        # Integer of the log index position in the block, null when
         # its pending
         idx = event["logIndex"]
 
@@ -582,7 +596,7 @@ class RelayerBlockchainProvider(IRelayerBlockchain):
         # Get UTC time when this event happened (block mined timestamp)
         # from our in-memory cache
         block_datetime: Optional[datetime] = self.get_block_timestamp(
-            block_num=block_number, 
+            block_num=block_number,
         )
 
         if block_datetime is None:

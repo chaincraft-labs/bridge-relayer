@@ -3,7 +3,7 @@ import asyncio
 from datetime import datetime, timezone
 from enum import Enum
 import functools
-from typing import List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
 from src.relayer.application.repository import Repository
 from src.relayer.application import BaseApp
@@ -11,7 +11,7 @@ from src.relayer.application.base_logging import RelayerLogging
 from src.relayer.application.execute_contracts import ExecuteContracts
 from src.relayer.config.config import Config
 from src.relayer.domain.config import (
-    EventRuleConfig, 
+    EventRuleConfig,
     RelayerBlockchainConfigDTO,
 )
 from src.relayer.domain.event_db import (
@@ -47,7 +47,32 @@ class EventStatus(Enum):
     FAILED = "failed"
 
 
-def async_repository_setup(method):
+def async_repository_setup(method: Callable) -> Callable:
+    """
+    Decorate a method to ensure asynchronous setup is performed before \
+        execution.
+
+    This decorator wraps a method to ensure that an asynchronous setup
+    method is called prior to the execution of the original method.
+    This is useful for initializing resources or configurations required
+    by the repository.
+
+    Args:
+        method (Callable): The asynchronous method to be wrapped.
+
+    Returns:
+        Callable: A wrapper function that executes the setup and then
+        calls the original method.
+
+    Raises:
+        Any exceptions raised by the setup or the wrapped method will
+        propagate as-is.
+
+    Example:
+        @async_repository_setup
+        async def fetch_data(self, query):
+            # Your method implementation
+    """
     @functools.wraps(method)
     async def wrapper(self, *args, **kwargs):
         await self._async_setup()
@@ -73,7 +98,8 @@ class ConsumeEvents(RelayerLogging, BaseApp):
             relayer_blockchain_provider (IRelayerBlockchain:
                 The blockchain provider
             relayer_register_provider (IRelayerRegister): The consumer provider
-            relayer_repository_provider (IRelayerRepository): The relayer repository
+            relayer_repository_provider (IRelayerRepository): The relayer
+                repository
             sleep (int, optional): Sleep in second. Defaults to 1.
             allocated_time (int, optional): Time in second allocated \
                 to wait for block finality
@@ -85,11 +111,12 @@ class ConsumeEvents(RelayerLogging, BaseApp):
         self.sleep = sleep
         self.allocated_time = allocated_time
         self.providers = {}
-        
+
         # providers
-        self.blockchain_provider: IRelayerBlockchain = relayer_blockchain_provider
+        self.blockchain_provider: IRelayerBlockchain = \
+            relayer_blockchain_provider
         self.register_provider: IRelayerRegister = relayer_register_provider()
-        
+
         # configurations (singleton)
         self.config = Config()
 
@@ -104,7 +131,7 @@ class ConsumeEvents(RelayerLogging, BaseApp):
 
     @async_repository_setup
     async def get_incomplete_bridge_tasks(self) -> List[BridgeTaskDTO]:
-        """Get incomplete bridge tasks
+        """Get incomplete bridge tasks.
 
         Returns:
             List[str]: The list of incomplete event tasks
@@ -115,12 +142,12 @@ class ConsumeEvents(RelayerLogging, BaseApp):
         except RepositoryErrorOnGet as e:
             self.logger.info(f"{self.Emoji.info.value}{e}")
             bridge_tasks = []
-        
+
         incomplete_bridge_tasks = []
         for bridge_task in bridge_tasks:
             if bridge_task.status != EventStatus.FAILED.value:
                 continue
-            
+
             incomplete_bridge_tasks.append(bridge_task)
 
         return incomplete_bridge_tasks
@@ -150,7 +177,9 @@ class ConsumeEvents(RelayerLogging, BaseApp):
                 self.logger.info(f"{self.Emoji.info.value}{msg}")
                 self.print_log("info", f"{msg}")
 
-                await self.register_provider.register_event(event=to_bytes(event))
+                await self.register_provider.register_event(
+                    event=to_bytes(event)
+                )
             except (
                 RepositoryErrorOnGet,
                 RelayerRegisterEventFailed
@@ -164,13 +193,13 @@ class ConsumeEvents(RelayerLogging, BaseApp):
 
     @async_repository_setup
     async def resume_bridge_task(
-        self, 
-        chain_id: int, 
+        self,
+        chain_id: int,
         block_number: int,
         tx_hash: str,
         log_index: int,
     ) -> None:
-        """Resume bridge task
+        """Resume bridge task.
 
         Args:
             chain_id (int): The chain id
@@ -199,9 +228,9 @@ class ConsumeEvents(RelayerLogging, BaseApp):
             self.print_log("info", f"{msg}")
 
             await self.register_provider.register_event(event=to_bytes(event))
-            
+
             try:
-                event.handled="registered"
+                event.handled = "registered"
                 await self.repository.save_event(event=event)
 
             except RepositoryErrorOnSave as e:
@@ -223,7 +252,21 @@ class ConsumeEvents(RelayerLogging, BaseApp):
     # Private methods
     # -------------------------------------------------------------------------
     async def _async_setup(self) -> None:
-        """Setup the relayer consumer."""
+        """
+        Set up the relayer consumer and initialize the repository.
+
+        This asynchronous method prepares the relayer consumer by retrieving
+        the necessary configuration details and setting up the repository
+        with the specified repository name derived from the data path.
+
+        The setup process involves:
+        1. Getting the data path from the configuration.
+        2. Retrieving the repository name.
+        3. Constructing the full path for the repository.
+        4. Calling the repository's setup method with the constructed
+        repository name.
+
+        """
         data_path = self.config.get_data_path()
         repo_name = self.config.get_repository_name()
         repository_name = data_path / f"tasks.{repo_name}"
@@ -240,7 +283,7 @@ class ConsumeEvents(RelayerLogging, BaseApp):
         """
         if chain_id in self.providers:
             return self.providers[chain_id]
-        
+
         self.providers[chain_id] = self.blockchain_provider()
         self.providers[chain_id].connect_client(chain_id=chain_id)
 
@@ -252,7 +295,7 @@ class ConsumeEvents(RelayerLogging, BaseApp):
         event: EventDTO,
         status: str,
     ) -> None:
-        """Save event operation
+        """Save event operation.
 
         Args:
             event (EventDTO): The event DTO
@@ -267,12 +310,12 @@ class ConsumeEvents(RelayerLogging, BaseApp):
             f"operation_hash={event.data.operation_hash_str} "
             f"event={event.event_name} "
         )
-        
+
         if status not in EventStatus:
             msg = f"Invalid status {status}."
             self.logger.error(f"{self.Emoji.fail.value}{id_msg}{msg}")
             raise RelayerBridgeTaskInvalidStatus(msg)
-        
+
         try:
             bridge_task = BridgeTaskDTO(
                 chain_id=event.chain_id,
@@ -301,16 +344,17 @@ class ConsumeEvents(RelayerLogging, BaseApp):
             event (EventDTO): The event data
 
         Returns:
-            Tuple[int, int]: The block finality and the block finality in second
+            Tuple[int, int]: The block finality and the block finality
+                in second
 
         Raises:
-            RelayerCalculateBLockFinalityError: 
+            RelayerCalculateBLockFinalityError:
                 Raise when calculate block finality failed.
         """
         try:
             cfg: RelayerBlockchainConfigDTO = \
                 self.config.get_blockchain_config(event.chain_id)
-            
+
             wait_block_validation = cfg.wait_block_validation
             second_per_block = cfg.block_validation_second_per_block
             block_finality_in_sec = wait_block_validation * second_per_block
@@ -346,7 +390,7 @@ class ConsumeEvents(RelayerLogging, BaseApp):
         block_finality: int,
         block_finality_in_sec: int,
     ) -> None:
-        """Validate the block finality
+        """Validate the block finality.
 
         Args:
             event (EventDTO): The event data
@@ -354,7 +398,7 @@ class ConsumeEvents(RelayerLogging, BaseApp):
             block_finality_in_sec (int): The block finality in second
 
         Raises:
-            RelayerBlockFinalityTimeExceededError: 
+            RelayerBlockFinalityTimeExceededError:
                 Raise when block finality validation has exceeded the allocated
                 time for processing.
         """
@@ -397,13 +441,13 @@ class ConsumeEvents(RelayerLogging, BaseApp):
                 return block_number
 
     async def manage_validate_block_finality(self, event: EventDTO) -> int:
-        """Manage validate block finality
+        """Manage validate block finality.
 
         Args:
             event (EventDTO): The event data
 
         Raises:
-            RelayerBlockValidationFailed: 
+            RelayerBlockValidationFailed:
 
         Returns:
             int: The block number
@@ -412,14 +456,14 @@ class ConsumeEvents(RelayerLogging, BaseApp):
             (
                 block_finality,
                 block_finality_in_sec
-            ) =  self.calculate_block_finality(event=event)
+            ) = self.calculate_block_finality(event=event)
 
             return await self.validate_block_finality(
                 event=event,
                 block_finality=block_finality,
                 block_finality_in_sec=block_finality_in_sec
             )
-        
+
         except (
             RelayerCalculateBLockFinalityError,
             RelayerBlockFinalityTimeExceededError,
@@ -427,7 +471,7 @@ class ConsumeEvents(RelayerLogging, BaseApp):
             raise RelayerBlockValidationFailed(e)
 
     def depend_on_event(self, event_name: str) -> Optional[str]:
-        """Get the rule name based on the event
+        """Get the rule name based on the event.
 
         Args:
             event_name (str): The event name
@@ -452,7 +496,7 @@ class ConsumeEvents(RelayerLogging, BaseApp):
 
     async def get_bridge_task_status(
         self,
-        operation_hash: str, 
+        operation_hash: str,
         event_name: str,
     ) -> Optional[str]:
         """Get the bridge task status.
@@ -490,7 +534,7 @@ class ConsumeEvents(RelayerLogging, BaseApp):
         """
         bridge_task_action_dto = BridgeTaskActionDTO(
             operation_hash=event.data.operation_hash_str,
-            func_name=func_name, 
+            func_name=func_name,
             params={
                 "operationHash": event.data.operation_hash_bytes,
                 "params": event.data.raw_params(),
@@ -503,7 +547,7 @@ class ConsumeEvents(RelayerLogging, BaseApp):
                 relayer_blockchain_provider=self.blockchain_provider,
                 log_level=self.log_level
             )(
-                chain_id=chain_id, 
+                chain_id=chain_id,
                 bridge_task_action_dto=bridge_task_action_dto
             )
 
@@ -515,10 +559,24 @@ class ConsumeEvents(RelayerLogging, BaseApp):
             raise
 
     async def callback(self, event: bytes):
-        """The callback function used to manage the event received.
+        """
+        Handle incoming events by managing them according to predefined rules.
+
+        This asynchronous method is triggered when an event is received.
+        It converts the event from bytes and processes it using the
+        `manage_event_with_rules` method. If an error occurs during
+        the event handling, it logs the error with a failure emoji.
 
         Args:
-            event (bytes): An event
+            event (bytes): The event data in bytes format that needs to be
+                processed.
+
+        Raises:
+            RepositoryErrorOnSave
+            EventConverterTypeError
+
+        Example:
+            await self.callback(event_data)
         """
         try:
             await self.manage_event_with_rules(event=from_bytes(event))
@@ -529,7 +587,7 @@ class ConsumeEvents(RelayerLogging, BaseApp):
             self.logger.error(f"{self.Emoji.fail.value} {e}")
 
     async def manage_event_with_rules(self, event: EventDTO) -> None:
-        """Manage event based on rules
+        """Manage event based on rules.
 
         Args:
             event (EventDTO): The event DTO
@@ -563,7 +621,7 @@ class ConsumeEvents(RelayerLogging, BaseApp):
                 try:
                     await self.manage_validate_block_finality(event=event)
                 except RelayerBlockValidationFailed:
-                    raise 
+                    raise
 
             # ----------------------------------------------------------------
             # Depends on event
@@ -599,7 +657,7 @@ class ConsumeEvents(RelayerLogging, BaseApp):
                     event=event,
                     func_name=cfg.func_name,
                 )
-            
+
             await self._save_event_operation(
                 event=event,
                 status=EventStatus.SUCCESS.value,
@@ -607,7 +665,8 @@ class ConsumeEvents(RelayerLogging, BaseApp):
 
         except RelayerConfigEventRuleKeyError as e:
             self.logger.warning(
-                f"{self.Emoji.alert.value}Unknown event={event.event_name}. {e}"
+                f"{self.Emoji.alert.value}Unknown event={event.event_name}."
+                f" {e}"
             )
 
         except (
