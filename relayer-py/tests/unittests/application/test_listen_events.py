@@ -17,7 +17,7 @@ from src.relayer.domain.event_db import (
 )
 from src.relayer.application.repository import Repository
 from src.relayer.config.config import Config
-from src.relayer.application.listen_events import ListeEvents
+from src.relayer.application.listen_events import ListenEvents
 from src.relayer.domain.config import (
     RelayerBlockchainConfigDTO,
     RelayerRegisterConfigDTO,
@@ -124,7 +124,7 @@ def repository():
 @pytest.fixture(scope="function")
 def listen_events(config, repository):
     with patch(f'{PATH_APP}.Config', return_value=config):
-        app = ListeEvents(
+        app = ListenEvents(
             relayer_blockchain_provider=RelayerBlockchainProvider(),
             relayer_register_provider=RelayerRegisterProvider(),
             relayer_repository_provider=RelayerRepositoryProvider(),

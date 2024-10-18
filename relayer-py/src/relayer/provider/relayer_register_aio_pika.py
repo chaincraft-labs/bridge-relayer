@@ -34,7 +34,7 @@ class RelayerRegisterEvent(IRelayerRegister):
         self.config = Config()
         self.relayer_register_config = self.config.get_register_config()
         self.queue_name: str = self.relayer_register_config.queue_name
-        self.callback: Callable
+        self._callback: Callable
         self.stop_event = asyncio.Event()
         self.semaphore = asyncio.Semaphore(10)
         self.tasks = 0

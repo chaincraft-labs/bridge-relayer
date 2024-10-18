@@ -10,7 +10,7 @@ current_dir: str = os.path.dirname(os.path.abspath(__file__))
 parent_dir: str = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
-from src.relayer.application.listen_events import ListeEvents  # noqa: E402
+from src.relayer.application.listen_events import ListenEvents  # noqa: E402
 from src.relayer.provider.relayer_blockchain_web3 import RelayerBlockchainProvider  # noqa: E402
 from src.relayer.provider.relayer_register_aio_pika import RelayerRegisterEvent  # noqa: E402
 from src.relayer.provider.relayer_repository_leveldb import RelayerRepositoryProvider  # noqa: E402
@@ -24,7 +24,7 @@ async def app(chain_id: int, debug: bool = False) -> None:
     relayer_repository_provider = RelayerRepositoryProvider()
 
     # Call apps
-    listener =  ListeEvents(
+    listener =  ListenEvents(
         chain_id=chain_id,
         relayer_blockchain_provider=relayer_blockchain_provider,
         relayer_register_provider=relayer_register_provider,

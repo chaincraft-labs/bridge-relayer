@@ -28,7 +28,7 @@ from src.relayer.interface.relayer_repository import IRelayerRepository
 from src.utils.converter import to_bytes
 
 
-class ListeEvents(RelayerLogging, BaseApp):
+class ListenEvents(RelayerLogging, BaseApp):
     """Listen blockchain events."""
 
     def __init__(
