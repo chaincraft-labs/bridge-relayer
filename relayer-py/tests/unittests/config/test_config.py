@@ -82,7 +82,7 @@ def blockchain_config_data():
                 "wait_block_validation": 6,
                 "block_validation_second_per_block": 12,
                 "smart_contract_address": '0x1234567890abcdef1234567890abcdef12345678',
-                "genesis_block": 123456789,
+                "smart_contract_deployment_block": 123456789,
                 "abi": [{}],
                 "client": 'middleware'
             }
@@ -156,7 +156,7 @@ def bridge_relayer_config():
                 "wait_block_validation": 2,
                 "block_validation_second_per_block": 5,
                 "smart_contract_address": "0x1212121212122121212121212121212121212121",
-                "genesis_block": 0,
+                "smart_contract_deployment_block": 0,
                 "client": "",
             },
             "ChainId2": {
@@ -166,7 +166,7 @@ def bridge_relayer_config():
                 "wait_block_validation": 2,
                 "block_validation_second_per_block": 5,
                 "smart_contract_address": "0x3434343434343434343434343434343434343434",
-                "genesis_block": 0,
+                "smart_contract_deployment_block": 0,
                 "client": "middleware",
             },
         },
@@ -607,7 +607,7 @@ def test_get_blockchain_config_success(
     assert result.wait_block_validation == bridge_relayer_config['relayer_blockchain']['ChainId1']['wait_block_validation']
     assert result.block_validation_second_per_block == bridge_relayer_config['relayer_blockchain']['ChainId1']['block_validation_second_per_block']
     assert result.smart_contract_address == bridge_relayer_config['relayer_blockchain']['ChainId1']['smart_contract_address']
-    assert result.genesis_block == bridge_relayer_config['relayer_blockchain']['ChainId1']['genesis_block']
+    assert result.smart_contract_deployment_block == bridge_relayer_config['relayer_blockchain']['ChainId1']['smart_contract_deployment_block']
     assert result.client == bridge_relayer_config['relayer_blockchain']['ChainId1']['client']
     assert result.abi == abis["1"]
 

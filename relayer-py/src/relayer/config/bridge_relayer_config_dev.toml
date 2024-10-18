@@ -6,24 +6,24 @@ repository = "bridge.dev"
 [relayer_blockchain]
     # Allfet local node
     [relayer_blockchain.ChainId440]
-    rpc_url = "http://127.0.0.1:9944/"
+    rpc_url = "{{ RPC_URL_440 }}"
     project_id = "{{ PROJECT_ID_440 }}"
     pk = "{{ PK_440 }}"
     wait_block_validation = 2
     block_validation_second_per_block = 5
-    smart_contract_address = "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
-    genesis_block = 0
+    smart_contract_address = "{{ SMART_CONTRACT_ADDRESS_440 }}"
+    smart_contract_deployment_block = "{{ SMART_CONTRACT_DEPLOYMENT_BLOCK_440 }}"
     client = ""
 
     # GETH node
     [relayer_blockchain.ChainId1337]
-    rpc_url = "http://127.0.0.1:8545/"
+    rpc_url = "{{ RPC_URL_1337 }}"
     project_id = "{{ PROJECT_ID_1337 }}"
     pk = "{{ PK_1337 }}"
     wait_block_validation = 2
     block_validation_second_per_block = 12
-    smart_contract_address = "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
-    genesis_block = 0
+    smart_contract_address = "{{ SMART_CONTRACT_ADDRESS_1337 }}"
+    smart_contract_deployment_block = "{{ SMART_CONTRACT_DEPLOYMENT_BLOCK_1337 }}"
     client = "middleware"
 
 [relayer_register]

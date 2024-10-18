@@ -14,7 +14,7 @@ class RelayerBlockchainConfigDTO:
     wait_block_validation: int
     block_validation_second_per_block: int
     smart_contract_address: str
-    genesis_block: int
+    smart_contract_deployment_block: int
     abi: Any
     client: str
 

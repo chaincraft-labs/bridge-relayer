@@ -6,47 +6,26 @@ repository = "bridge.prod"
 [relayer_blockchain]
   # Allfeat tesnet 
   [relayer_blockchain.ChainId441]
-  rpc_url = "https://harmonie-endpoint-02.allfeat.io/"
+  rpc_url = "{{ RPC_URL_441 }}"
   project_id = "{{ PROJECT_ID_441 }}"
   pk = "{{ PK_441 }}"
   wait_block_validation = 6
   block_validation_second_per_block = 5
-  smart_contract_address = "0xE86603d2b796412432237c4C0837F68175f13D08"
-  genesis_block = 1091325
+  smart_contract_address = "{{ SMART_CONTRACT_ADDRESS_441 }}"
+  smart_contract_deployment_block = "{{ SMART_CONTRACT_DEPLOYMENT_BLOCK_441 }}"
   client = ""
 
   # Sepolia
   [relayer_blockchain.ChainId11155111]
-  rpc_url = "https://eth-sepolia.g.alchemy.com/v2/"
+  rpc_url = "{{ RPC_URL_11155111 }}"
   project_id = "{{ PROJECT_ID_11155111 }}"
   pk = "{{ PK_11155111 }}"
   wait_block_validation = 6
   block_validation_second_per_block = 12
-  smart_contract_address = "0xfC7D37432d637e334b391F5ecf283d69783dBe64"
-  genesis_block = 6186178
+  smart_contract_address = "{{ SMART_CONTRACT_ADDRESS_11155111 }}"
+  smart_contract_deployment_block = "{{ SMART_CONTRACT_DEPLOYMENT_BLOCK_11155111 }}"
   client = "middleware"
 
-  # Ethereum mainnet
-  [relayer_blockchain.ChainId1]
-  rpc_url = "https://eth-mainnet.g.alchemy.com/v2/"
-  project_id = "{{ PROJECT_ID_1 }}"
-  pk = "{{ PK_1 }}"
-  wait_block_validation = 6
-  block_validation_second_per_block = 12
-  smart_contract_address = "0xE86603d2b796412432237c4C0837F68175f13D08"
-  genesis_block = 1091325
-  client = ""
-
-  # Polygon testnet
-  [relayer_blockchain.ChainId80002]
-  rpc_url = "https://polygon-amoy.g.alchemy.com/v2/"
-  project_id = "{{ PROJECT_ID_80002 }}"
-  pk = "{{ PK_80002 }}"
-  wait_block_validation = 6
-  block_validation_second_per_block = 12
-  smart_contract_address = "0x6dC7CfE7Ce3c4d071fABC7B616E94fBba361B212"
-  genesis_block = 8267279
-  client = "middleware"
 
 [relayer_register]
 # RabbitMQ Broker

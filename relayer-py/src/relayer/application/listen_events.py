@@ -138,7 +138,7 @@ class ListeEvents(RelayerLogging, BaseApp):
 
             start_block: int = max(
                 last_scanned_block - block_to_delete,
-                self.blockchain_config.genesis_block,
+                self.blockchain_config.smart_contract_deployment_block,
             )
 
         start = time()
@@ -252,8 +252,8 @@ class ListeEvents(RelayerLogging, BaseApp):
             f"{self.blockchain_provider.get_account_address()}\n"
             f"{"Contract address":<{title_length}} : "
             f"{self.blockchain_config.smart_contract_address}\n"
-            f"{"genesis block":<{title_length}} : "
-            f"{self.blockchain_config.genesis_block}\n"
+            f"{"Contract deployment block":<{title_length}} : "
+            f"{self.blockchain_config.smart_contract_deployment_block}\n"
             f"{"start_block":<{title_length}} : {start_block}\n"
             f"{"end_block":<{title_length}} : {end_block}\n"
             f"{"blocks_to_scan":<{title_length}} : {blocks_to_scan}\n"

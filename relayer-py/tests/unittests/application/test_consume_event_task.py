@@ -52,10 +52,8 @@ DB_TEST = str(TEST_ROOT_PATH / TEST_REPOSITORY_NAME)
 # -------------------------------------------------------
 @pytest.fixture(autouse=True)
 def disable_logging():
-    # Désactiver les logs pendant les tests
     logging.disable(logging.CRITICAL)
     yield
-    # Réactiver les logs après les tests
     logging.disable(logging.NOTSET)
 
 @pytest.fixture(scope="function")
@@ -82,7 +80,7 @@ def blockchain_config():
         wait_block_validation=6, 
         block_validation_second_per_block=0,
         smart_contract_address='0x1234567890abcdef1234567890abcdef12345678', 
-        genesis_block=666, 
+        smart_contract_deployment_block=666, 
         abi=[{}], 
         client='middleware'
     )

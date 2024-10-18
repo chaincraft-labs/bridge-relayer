@@ -7,7 +7,19 @@
 
 ---
 
-A centralized blockchain bridge relayer that aims to connect two blockchains (Proof Of Concept: POC)
+A **centralized blockchain bridge** relayer that aims to connect two blockchains (Proof Of Concept: POC)
+
+A blockchain bridge is a technology that allows two different blockchains to communicate and exchange data or assets with each other. Blockchains are often siloed and operate independently, which means that assets or information on one blockchain cannot naturally move to or interact with another blockchain. A bridge acts as a connection point or "gateway" between these networks, enabling cross-chain transfers and interoperability.
+
+For example, if someone wants to move cryptocurrency or tokens from Blockchain A (such as Ethereum) to Blockchain B (like Binance Smart Chain), a bridge relayer facilitates this transaction by locking or burning the tokens on Blockchain A and issuing an equivalent amount of tokens on Blockchain B.
+
+A centralized blockchain bridge relayer would be responsible for managing these cross-chain transfers in a centralized manner, meaning that the authority and control over the relaying process reside with a single entity or small group, as opposed to a decentralized system where many participants validate and process the transactions.
+
+In summary:
+
+A bridge enables two different blockchains to communicate and share assets or information.
+The relayer acts as an intermediary responsible for ensuring that the data or assets are securely transferred between the two blockchains.
+A centralized relayer means that a central authority manages this process, potentially offering faster or more controlled operations but at the expense of decentralization.
 
 ## Get started
 
@@ -33,34 +45,76 @@ poetry install
 
 #### Environment files
 
-There are 3 files at root level.
+The 'relayer-py' folder must contain 3 environment file as described below:
 
-- .env
-- .env.config.dev
-- .env.config.prod
+- `.env`             : Enable the production or development environment
+- `.env.config.dev`  : Development environment settings
+- `.env.config.prod` : Production environment settings
 
-Set your private key for PK_*
-Set your project id for PROJECT_ID_* (see: https://dashboard.alchemy.com)
 
 1. copy sample.env to .env
-2. copy sample.env.config.dev to .env.config.dev
-3. update .env.config.dev values
-4. copy sample.env.config.prod to .env.config.prod
-5. update .env.config.prod values
+2. copy sample.env.config to `.env.config.dev` or `.env.config.prod`
+3. update `.env.config.dev` or `.env.config.prod` values
+
+> *See the `sample.env.config` file for more detail.*
 
 #### Configuration and abi files
 
-There are 4 files at the location: src/config
+There are 4 files at the location: src/relayer/config
 
 - abi_dev.json
 - abi.json
 - bridge_relayer_config_dev.toml
 - bridge_relayer_config.toml
 
-1. edit **bridge_relayer_config_dev.toml** and **bridge_relayer_config.toml**
-   1. set `RelayerBridge` smart contract's address
-2. edit **abi.json** and **abi_dev.json**
-   1. add the abi for each chain_id
+
+1. edit `bridge_relayer_config_dev.toml` and/or `bridge_relayer_config.toml` and set the chain IDs
+2. edit **abi.json** and **abi_dev.json** and add the abi for each chain IDs
+
+
+### Run the bridge relayer
+
+The bridge relayer application executes 3 services as described below:
+
+- an event listener for the first blockchain (e.g chain ID = 1337)
+- an event listener for the second blockchain (e.g chain ID = 440)
+- a task listener 
+
+*The event listener* is responsible for monitoring and parsing all events emitted by the smart contract, storing these events in a local database (using LevelDB), and publishing them to a message queue via a broker (RabbitMQ).
+
+*The task listener* is responsible for consuming new tasks from the message queue, interpreting them, and interacting with the appropriate blockchain to execute the required operations.
+
+>! If you want to test locally you need to run 
+>
+> - A RabbitMQ server (see below the procedure with Docker)
+> - 2 node clients for blockchains (See below to run geth and Allfeat client nodes) 
+
+#### Run the event listeners for Allfeat and geth
+
+Open a terminal and execute:
+
+```bash
+# Allfeat local node
+cd relayer-py
+poetry run python bin/event_listener.py --chain_id 440
+```
+
+In the second terminal execute:
+
+```bash
+# Geth local node
+cd relayer-py
+poetry run python bin/event_listener.py --chain_id 1337
+```
+
+#### Run the event task listener
+
+Open a terminal and execute:
+
+```bash
+poetry run python bin/task_listener.py --watch
+```
+
 
 ### Run RabbitMQ server
 
@@ -97,70 +151,19 @@ Through the RabbitMQ web GUI, go to:
 > `env.config.prod`
 
 
-### Run the bridge relayer
-
-You need to run 2 event listeners and 1 event task listener.
-
-*Example:*
-
-A event listener per blockchain (chain id)
-
-- chain id 441 (Allfeat)
-- chain id 440 (Allfeat local node)
-- chain id 11155111 (Sepolia)
-- chain id 1337 (Geth local node)
-- chain id 80002 (Polygon)
-
-#### Run an event listener for Allfeat
-
-In a new terminal execute:
-
-```bash
-cd relayer-py
-# Allfeat dev
-poetry run python bin/event_listener.py --chain_id 441
-# Allfeat local node
-poetry run python bin/event_listener.py --chain_id 440
-```
-
-#### Run an event listener for Ethereum or other blockchain
-
-In a new terminal execute:
-
-```bash
-# Sepolia
-poetry run python bin/event_listener.py --chain_id 11155111
-# Geth local node
-poetry run python bin/event_listener.py --chain_id 1337
-# Polygon
-poetry run python bin/event_listener.py --chain_id 80002
-```
-
-#### Run the event task listener
-
-You need to run at least 1 listener, but you can increase the amount of listener as needed.
-
-In a new terminal execute:
-
-```bash
-poetry run python bin/task_listener.py --watch
-```
-
 ## Geth
 
-```bash
+You can find the official documentation to install and run a Geth node [geth.ethereum.org](https://geth.ethereum.org/docs/getting-started/installing-geth)
 
+```bash
 # Start a geth node
 geth --datadir /your_data_path --dev.period 12 --http --http.corsdomain '*' --http.api web3,eth,debug,personal,net --vmdebug --dev console
-
-# Deploy 
-[See commands here](https://github.com/AlyraButerin/Allfeat-EVM-bridge-POC/blob/dev/hardhat/COMMANDS.md)
-
 ```
 
 ## Allfeat node
 
-### Node
+You can find the official documentation to run a node [docs.allfeat.com](https://docs.allfeat.com/running-a-node/without-docker/)
+
 
 ```bash
 # start node
@@ -172,32 +175,6 @@ geth --datadir /your_data_path --dev.period 12 --http --http.corsdomain '*' --ht
 https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fharmonie-endpoint-02.allfeat.io#/settings
 
 
-## Event magement
+## Deploy the smart contracts
 
-| Chain<br>Event | Event                         | Block<br>Finality| Chain<br>Exec | Exec Func                            | Condition        |
-|----------------|-------------------------------|------------------|---------------|--------------------------------------|------------------|
-| from           | OperationCreated              | Yes              | NA            | NA                                   | NA               |
-| to             | FeesDeposited                 | Yes              | to            | SendFeesLockConfirmation             | NA               |
-| to             | FeesDepositConfirmed          | No               | from          | ReceiveFeesLockConfirmation          | NA               |
-| from           | FeesLockedConfirmed           | No               | from          | confirmFeesLockedAndDepositConfirmed | OperationCreated |
-| from           | FeesLockedAndDepositConfirmed | No               | to            | completeOperation                    | NA               |
-| to             | OperationFinalized            | No               | to            | receivedFinalizedOperation           | NA               |
-
-
-
-### Rename function and event
-
-| Event                         | New event name                                      | Function name                        | New function name                               | chain |
-|-------------------------------|-----------------------------------------------------|--------------------------------------|-------------------------------------------------|-------|
-|                               |                                                     | createBridgeOperation                | depositTokensOnOriginChain                      | from  |
-| OperationCreated              | TokenDepositedOnOrigineChain                        |                                      |                                                 |       |
-|                               |                                                     | depositFees                          | depositTokensForFeesOnDestinationChain          | to    |
-| FeesDeposited                 | TokensDepositedForFeesOnDestinationChain            | SendFeesLockConfirmation             | confirmFeeTokensDepositOnDestinationChainB      | to    |
-| FeesDepositConfirmed          | FeeTokensDepositedOnDestinationChainConfirmedB      | ReceiveFeesLockConfirmation          | confirmFeeTokensDepositOnDestinationChainA      | from  |
-| FeesLockedConfirmed           | FeeTokensDepositedOnDestinationChainConfirmedA      | confirmFeesLockedAndDepositConfirmed | confirmTokensDepositOnBothChain                 | from  |
-| FeesLockedAndDepositConfirmed | TokensDepositedOnBothChainConfirmed                 | completeOperation                    | completeBridgeOperation                         | to    |
-| OperationFinalized            | BridgeOperationCompleted                            | receivedFinalizedOperation           | confirmBridgeOperationCompleted                 | to    |
-
-> Note
-> - `A` -> channel A (origin/from)
-> - `B` -> channel B (destination/to)
+You can find the official documentation for [deploying smart contract](https://github.com/AlyraButerin/Allfeat-EVM-bridge-POC/blob/dev/hardhat/COMMANDS.md)

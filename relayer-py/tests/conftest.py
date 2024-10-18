@@ -34,34 +34,19 @@ EVENT_DATA_SAMPLE = AttributeDict({
 })
 
 
-
-
 TEST_ENV_FILE = ".env.test"
-# CHAIN_ID = 123
-# RPC_URL = "https://mock.test/fake_rpc_url:1234"
-# SMART_CONTRACT_ADDRESS = "0x11111a1aa11aaaa1aaaa111111a1111a1a1a111a"
-# GENESIS_BLOCK = 987
-# PROJECT_ID = "aaaa11a111a111a11a111aa1aaa1111a"
-# ABI_NAME = "abi_test"
-# WAIT_BLOCK_VALIDATION = 6
-# BLOCK_VALIDATION_SECOND_PER_BLOCK = 0
-# PK = "111aaa111aaa111aaa111aaaa111aaa111aaaa111aaaa111aaaa111aaa111aaa"
-# CLIENT = "middleware"
-
-
-
 DATA_TEST = AttributeDict({
   "TEST_ENV_FILE": ".env.test",
-  "CHAIN_ID": 123, # ok
-  "RPC_URL": "https://mock.test/fake_rpc_url:1234", # ok
-  "SMART_CONTRACT_ADDRESS": "0x11111a1aa11aaaa1aaaa111111a1111a1a1a111a", # ok
-  "GENESIS_BLOCK": 987, # ok
-  "PROJECT_ID": "aaaa11a111a111a11a111aa1aaa1111a", # ok
-  "ABI_NAME": "abi_test", # ok
-  "WAIT_BLOCK_VALIDATION": 6, # ok
-  "BLOCK_VALIDATION_SECOND_PER_BLOCK": 0, # ok
-  "PK": "111aaa111aaa111aaa111aaaa111aaa111aaaa111aaaa111aaaa111aaa111aaa", # ok
-  "CLIENT": "middleware", # ok
+  "CHAIN_ID": 123,
+  "RPC_URL": "https://mock.test/fake_rpc_url:1234",
+  "SMART_CONTRACT_ADDRESS": "0x11111a1aa11aaaa1aaaa111111a1111a1a1a111a",
+  "SMART_CONTRACT_DEPLOYMENT_BLOCK": 987,
+  "PROJECT_ID": "aaaa11a111a111a11a111aa1aaa1111a",
+  "ABI_NAME": "abi_test",
+  "WAIT_BLOCK_VALIDATION": 6,
+  "BLOCK_VALIDATION_SECOND_PER_BLOCK": 0,
+  "PK": "111aaa111aaa111aaa111aaaa111aaa111aaaa111aaaa111aaaa111aaa111aaa",
+  "CLIENT": "middleware",
   "ABI": {
     'abi_test': [{'inputs': [{'internalType': 'address',
         'name': 'newOwner',

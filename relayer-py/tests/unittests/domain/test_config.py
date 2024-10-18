@@ -18,7 +18,7 @@ def blockchain_config():
         wait_block_validation=DATA_TEST.WAIT_BLOCK_VALIDATION,
         block_validation_second_per_block=DATA_TEST.BLOCK_VALIDATION_SECOND_PER_BLOCK,
         smart_contract_address=DATA_TEST.SMART_CONTRACT_ADDRESS,
-        genesis_block=DATA_TEST.GENESIS_BLOCK,
+        smart_contract_deployment_block=DATA_TEST.SMART_CONTRACT_DEPLOYMENT_BLOCK,
         abi=DATA_TEST.ABI[DATA_TEST.ABI_NAME],
         client=DATA_TEST.CLIENT,
     )
@@ -41,7 +41,7 @@ def test_relayer_blockchain_config_dto_instantiate_success(blockchain_config):
     assert blockchain_config.chain_id == DATA_TEST.CHAIN_ID
     assert blockchain_config.rpc_url == DATA_TEST.RPC_URL
     assert blockchain_config.smart_contract_address == DATA_TEST.SMART_CONTRACT_ADDRESS
-    assert blockchain_config.genesis_block == DATA_TEST.GENESIS_BLOCK
+    assert blockchain_config.smart_contract_deployment_block == DATA_TEST.SMART_CONTRACT_DEPLOYMENT_BLOCK
     assert blockchain_config.abi == DATA_TEST.ABI[DATA_TEST.ABI_NAME]
     assert blockchain_config.pk == DATA_TEST.PK
     assert blockchain_config.wait_block_validation == DATA_TEST.WAIT_BLOCK_VALIDATION
@@ -53,7 +53,7 @@ def test_relayer_blockchain_config_dto_as_dict(blockchain_config):
         "chain_id": DATA_TEST.CHAIN_ID,
         "rpc_url": DATA_TEST.RPC_URL,
         "smart_contract_address": DATA_TEST.SMART_CONTRACT_ADDRESS,
-        "genesis_block": DATA_TEST.GENESIS_BLOCK,
+        "smart_contract_deployment_block": DATA_TEST.SMART_CONTRACT_DEPLOYMENT_BLOCK,
         "project_id": DATA_TEST.PROJECT_ID,
         "abi": DATA_TEST.ABI[DATA_TEST.ABI_NAME],
         "pk": DATA_TEST.PK,

@@ -221,7 +221,7 @@ def bridge_relayer_config():
         "wait_block_validation": 2,
         "block_validation_second_per_block": 5,
         "smart_contract_address": "0x1212121212122121212121212121212121212121",
-        "genesis_block": 0,
+        "smart_contract_deployment_block": 0,
         "client": "",
     }
 

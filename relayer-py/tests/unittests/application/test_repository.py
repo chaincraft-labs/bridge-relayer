@@ -5,7 +5,10 @@ import pathlib
 from unittest.mock import AsyncMock
 
 import pytest
-from src.relayer.domain.exception import RepositoryErrorOnGet, RepositoryErrorOnSave
+from src.relayer.domain.exception import (
+    RepositoryErrorOnGet, 
+    RepositoryErrorOnSave
+)
 from src.relayer.domain.event_db import BridgeTaskDTO, EventDTO, EventDataDTO
 from src.relayer.provider.mock_relayer_repository_leveldb import (
     RelayerRepositoryProvider

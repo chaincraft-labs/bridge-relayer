@@ -52,7 +52,7 @@ def get_blockchain_config():
         wait_block_validation=6, 
         block_validation_second_per_block=0,
         smart_contract_address='0x1234567890abcdef1234567890abcdef12345678', 
-        genesis_block=123456789, 
+        smart_contract_deployment_block=123456789, 
         abi=[{}], 
         client='middleware'
     )

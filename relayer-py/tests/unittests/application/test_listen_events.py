@@ -4,7 +4,6 @@ import pathlib
 from unittest.mock import AsyncMock, MagicMock, call, patch
 import pytest
 
-
 from src.relayer.domain.exception import (
     RelayerEventScanFailed, 
     RelayerRegisterEventFailed, 
@@ -68,7 +67,7 @@ def blockchain_config():
         wait_block_validation=6, 
         block_validation_second_per_block=0,
         smart_contract_address='0x1234567890abcdef1234567890abcdef12345678', 
-        genesis_block=666, 
+        smart_contract_deployment_block=666, 
         abi=[{}], 
         client='middleware'
     )
@@ -272,7 +271,7 @@ def test_show_cli_title(listen_events):
                 f"{'chain_id':<{expected_title_length}} : {listen_events.chain_id}\n"
                 f"{'Account address':<{expected_title_length}} : {listen_events.blockchain_provider.get_account_address()}\n"
                 f"{'Contract address':<{expected_title_length}} : {listen_events.blockchain_config.smart_contract_address}\n"
-                f"{'genesis block':<{expected_title_length}} : {listen_events.blockchain_config.genesis_block}\n"
+                f"{'Contract deployment block':<{expected_title_length}} : {listen_events.blockchain_config.smart_contract_deployment_block}\n"
                 f"{'start_block':<{expected_title_length}} : {start_block}\n"
                 f"{'end_block':<{expected_title_length}} : {end_block}\n"
                 f"{'blocks_to_scan':<{expected_title_length}} : {blocks_to_scan}\n"
@@ -417,7 +416,7 @@ async def test__call___with_resume_events(
     listen_events.get_suggested_scan_end_block.return_value = 100
     listen_events.repository.get_last_scanned_block = AsyncMock()
     listen_events.repository.get_last_scanned_block.return_value = 10
-    listen_events.blockchain_config.genesis_block = 321
+    listen_events.blockchain_config.smart_contract_deployment_block = 321
     listen_events.show_cli_title = MagicMock()
     listen_events.scan = MagicMock()
     listen_events.scan.return_value = example_events_scan
@@ -446,7 +445,7 @@ async def test__call___with_resume_events(
     )
     listen_events.get_suggested_scan_end_block.call_count == 2
     listen_events.repository.get_last_scanned_block.assert_called_once_with(listen_events.chain_id)
-    # start_block = get_last_scanned_block - block_to_delete = 0 OR genesis_block = 321
+    # start_block = get_last_scanned_block - block_to_delete = 0 OR smart_contract_deployment_block = 321
     # start_block Max => 321
     # end_block = 100
     start_block = 321
@@ -485,7 +484,7 @@ async def test__call___with_with_progress_bar(
     listen_events.get_suggested_scan_end_block.return_value = 100
     listen_events.repository.get_last_scanned_block = AsyncMock()
     listen_events.repository.get_last_scanned_block.return_value = 10
-    listen_events.blockchain_config.genesis_block = 321
+    listen_events.blockchain_config.smart_contract_deployment_block = 321
     listen_events.show_cli_title = MagicMock()
     listen_events.run_scan_with_progress_bar_render = MagicMock()
     listen_events.run_scan_with_progress_bar_render.return_value = example_events_scan
@@ -511,7 +510,7 @@ async def test__call___with_with_progress_bar(
     )
     listen_events.get_suggested_scan_end_block.call_count == 2
     listen_events.repository.get_last_scanned_block.assert_called_once_with(listen_events.chain_id)
-    # start_block = get_last_scanned_block - block_to_delete = 0 OR genesis_block = 321
+    # start_block = get_last_scanned_block - block_to_delete = 0 OR smart_contract_deployment_block = 321
     # start_block Max => 321
     # end_block = 100
     start_block = 321
@@ -548,7 +547,7 @@ async def test__call___with_raise_exception_1(
     listen_events.get_suggested_scan_end_block.return_value = 100
     listen_events.repository.get_last_scanned_block = AsyncMock()
     listen_events.repository.get_last_scanned_block.side_effect = RepositoryErrorOnGet('fake error')
-    listen_events.blockchain_config.genesis_block = 321
+    listen_events.blockchain_config.smart_contract_deployment_block = 321
     listen_events.show_cli_title = MagicMock()
     listen_events.scan = MagicMock()
     listen_events.scan.return_value = example_events_scan
@@ -574,7 +573,7 @@ async def test__call___with_raise_exception_1(
     )
     listen_events.get_suggested_scan_end_block.call_count == 2
     listen_events.repository.get_last_scanned_block.assert_called_once_with(listen_events.chain_id)
-    # start_block = get_last_scanned_block - block_to_delete = 0 OR genesis_block = 321
+    # start_block = get_last_scanned_block - block_to_delete = 0 OR smart_contract_deployment_block = 321
     # start_block Max => 321
     # end_block = 100
     start_block = 321
@@ -611,7 +610,7 @@ async def test__call___with_raise_exception_2(
     listen_events.get_suggested_scan_end_block.return_value = 100
     listen_events.repository.get_last_scanned_block = AsyncMock()
     listen_events.repository.get_last_scanned_block.return_value = 10
-    listen_events.blockchain_config.genesis_block = 321
+    listen_events.blockchain_config.smart_contract_deployment_block = 321
     listen_events.show_cli_title = MagicMock()
     listen_events.scan = MagicMock()
     listen_events.scan.side_effect = RelayerEventScanFailed('fake error')
@@ -637,7 +636,7 @@ async def test__call___with_raise_exception_2(
     )
     listen_events.get_suggested_scan_end_block.call_count == 2
     listen_events.repository.get_last_scanned_block.assert_called_once_with(listen_events.chain_id)
-    # start_block = get_last_scanned_block - block_to_delete = 0 OR genesis_block = 321
+    # start_block = get_last_scanned_block - block_to_delete = 0 OR smart_contract_deployment_block = 321
     # start_block Max => 321
     # end_block = 100
     start_block = 321
@@ -670,7 +669,7 @@ async def test__call___with_with_no_event_scanned(
     listen_events.get_suggested_scan_end_block.return_value = 100
     listen_events.repository.get_last_scanned_block = AsyncMock()
     listen_events.repository.get_last_scanned_block.return_value = 10
-    listen_events.blockchain_config.genesis_block = 321
+    listen_events.blockchain_config.smart_contract_deployment_block = 321
     listen_events.show_cli_title = MagicMock()
     listen_events.scan = MagicMock()
     listen_events.scan.return_value = example_events_scan
@@ -696,7 +695,7 @@ async def test__call___with_with_no_event_scanned(
     )
     listen_events.get_suggested_scan_end_block.call_count == 2
     listen_events.repository.get_last_scanned_block.assert_called_once_with(listen_events.chain_id)
-    # start_block = get_last_scanned_block - block_to_delete = 0 OR genesis_block = 321
+    # start_block = get_last_scanned_block - block_to_delete = 0 OR smart_contract_deployment_block = 321
     # start_block Max => 321
     # end_block = 100
     start_block = 321
@@ -732,7 +731,7 @@ async def test__call___set_last_scanned_block_raise_Exception(
     listen_events.get_suggested_scan_end_block.return_value = 100
     listen_events.repository.get_last_scanned_block = AsyncMock()
     listen_events.repository.get_last_scanned_block.return_value = 10
-    listen_events.blockchain_config.genesis_block = 321
+    listen_events.blockchain_config.smart_contract_deployment_block = 321
     listen_events.show_cli_title = MagicMock()
     listen_events.scan = MagicMock()
     listen_events.scan.return_value = example_events_scan
@@ -762,7 +761,7 @@ async def test__call___set_last_scanned_block_raise_Exception(
     )
     listen_events.get_suggested_scan_end_block.call_count == 2
     listen_events.repository.get_last_scanned_block.assert_called_once_with(listen_events.chain_id)
-    # start_block = get_last_scanned_block - block_to_delete = 0 OR genesis_block = 321
+    # start_block = get_last_scanned_block - block_to_delete = 0 OR smart_contract_deployment_block = 321
     # start_block Max => 321
     # end_block = 100
     start_block = 321
@@ -809,7 +808,7 @@ async def test__call___set_last_scanned_block_event_alreadt_registered(
     listen_events.get_suggested_scan_end_block.return_value = 100
     listen_events.repository.get_last_scanned_block = AsyncMock()
     listen_events.repository.get_last_scanned_block.return_value = 10
-    listen_events.blockchain_config.genesis_block = 321
+    listen_events.blockchain_config.smart_contract_deployment_block = 321
     listen_events.show_cli_title = MagicMock()
     listen_events.scan = MagicMock()
     listen_events.scan.return_value = example_events_scan
