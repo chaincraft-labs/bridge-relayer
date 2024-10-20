@@ -252,7 +252,7 @@ class ListenEvents(RelayerLogging, BaseApp):
             f"{self.blockchain_provider.get_account_address()}\n"
             f"{"Contract address":<{title_length}} : "
             f"{self.blockchain_config.smart_contract_address}\n"
-            f"{"Contract deployment block":<{title_length}} : "
+            f"{"Deployment block":<{title_length}} : "
             f"{self.blockchain_config.smart_contract_deployment_block}\n"
             f"{"start_block":<{title_length}} : {start_block}\n"
             f"{"end_block":<{title_length}} : {end_block}\n"
