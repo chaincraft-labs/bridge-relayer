@@ -113,6 +113,7 @@ class RelayerBlockchainProvider(IRelayerBlockchain):
 
         # # Load config (singleton)
         self.config = Config()
+        self.errors: Dict[str, str] = {}
 
     # -------------------------------------------------------------
     # Implemented functions
@@ -127,6 +128,7 @@ class RelayerBlockchainProvider(IRelayerBlockchain):
         self.relay_blockchain_config = self.config.get_blockchain_config(
             self.chain_id,
         )
+        self.errors = self.config.get_smart_contract_errors(chain_id)
 
         self.w3: Web3 = self._set_provider()
         self.w3_contract: Contract = self._set_contract()
@@ -307,6 +309,21 @@ class RelayerBlockchainProvider(IRelayerBlockchain):
     # Internal functions
     # -------------------------------------------------------------
 
+    def get_error_name(self, error: Exception) -> Exception:
+        """Get the error name.
+
+        Args:
+            error (Exception): The error
+
+        Returns:
+            Exception: The error name
+        """
+        if isinstance(error.args[0], tuple) and \
+                self.errors.get(error.args[0][0]):
+            error_name = self.errors[error.args[0][0]]
+            return Exception(error.args[0][0], error_name)
+        return error
+
     def _build_tx(
         self,
         func: Callable,
@@ -326,8 +343,7 @@ class RelayerBlockchainProvider(IRelayerBlockchain):
             Dict[str, Any]: The built transaction
 
         Raises:
-            RelayerBlockchainBuildTxError: Raise error if failed \
-                to build the transaction
+            RelayerBlockchainBuildTxError
         """
         try:
             return func(**params).build_transaction(
@@ -338,7 +354,7 @@ class RelayerBlockchainProvider(IRelayerBlockchain):
             )
 
         except Exception as e:
-            msg = (f"Build transaction failed! error={e}")
+            msg = f"Build transaction failed! error={self.get_error_name(e)}"
             raise RelayerBlockchainBuildTxError(msg)
 
     def _sign_tx(
@@ -356,8 +372,7 @@ class RelayerBlockchainProvider(IRelayerBlockchain):
             SignedTransaction: The signed transaction
 
         Raises:
-            RelayerBlockchainSignTxError: If failed to sign the \
-                transaction
+            RelayerBlockchainSignTxError
         """
         try:
             return self.w3.eth.account.sign_transaction(
@@ -366,7 +381,9 @@ class RelayerBlockchainProvider(IRelayerBlockchain):
             )
 
         except Exception as e:
-            msg = (f"Failed to sign transaction! error={e}")
+            msg = (
+                f"Failed to sign transaction! error={self.get_error_name(e)}"
+            )
             raise RelayerBlockchainSignTxError(msg)
 
     def _send_raw_tx(
@@ -390,7 +407,10 @@ class RelayerBlockchainProvider(IRelayerBlockchain):
             )
 
         except Exception as e:
-            msg = (f"Failed to send raw transaction! error={e}")
+            msg = (
+                f"Failed to send raw transaction! "
+                f"error={self.get_error_name(e)}"
+            )
             raise RelayerBlockchainSendRawTxError(msg)
 
     def _set_provider(self) -> Web3:

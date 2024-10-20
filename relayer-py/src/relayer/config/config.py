@@ -5,6 +5,8 @@ import pathlib
 from typing import Any, Dict, List
 from dotenv import load_dotenv
 
+from eth_utils import keccak
+from hexbytes import HexBytes
 import tomli
 from jinja2 import Template
 
@@ -184,6 +186,18 @@ def read_abis() -> Any:
         raise RelayerConfigABIAttributeMissing(e)
 
 
+def convert_error_to_hex(error_name: str) -> str:
+    """Convert error name to hex.
+
+    Args:
+        error_name (str): The error name
+
+    Returns:
+        str: The error name in hex
+    """
+    return HexBytes(keccak(text=error_name+'()').hex()[:8]).hex()
+
+
 # ---------------------------------------------------------------------------
 # Exported functions
 # ---------------------------------------------------------------------------
@@ -340,3 +354,18 @@ class Config(metaclass=Singleton):
     def get_repository_name(self) -> str:
         """Get the repository name."""
         return self.bridge_relayer_config['environment']['repository']
+
+    def get_smart_contract_errors(self, chain_id: int) -> Dict[str, str]:
+        """Get the smart contract errors.
+
+        Args:
+            chain_id (int): The chain id
+
+        Returns:
+            Dict[str, str]: The smart contract errors
+        """
+        return {
+            convert_error_to_hex(abi_data['name']): abi_data['name']
+            for abi_data in self.get_abi(chain_id)
+            if abi_data.get('type') == 'error'
+        }
