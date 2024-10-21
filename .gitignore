@@ -1,7 +1,12 @@
+# Custom
+test-state*.json
+data/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
+.DS_Store
 
 # C extensions
 *.so
@@ -38,6 +43,7 @@ pip-delete-this-directory.txt
 
 # Unit test / coverage reports
 htmlcov/
+coverage.json
 .tox/
 .nox/
 .coverage

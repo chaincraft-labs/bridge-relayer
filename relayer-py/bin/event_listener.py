@@ -1,37 +1,38 @@
 from argparse import ArgumentParser, Namespace, RawDescriptionHelpFormatter
+import asyncio
 import os
 from os.path import basename
 import sys
 from sys import argv
 from textwrap import dedent
 
-
 current_dir: str = os.path.dirname(os.path.abspath(__file__))
 parent_dir: str = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
-from src.relayer.application.relayer_blockchain import App 
-from src.relayer.provider.relayer_blockchain_web3 import (
-    RelayerBlockchainProvider as p_relayer_blockchain,
-)
-from src.relayer.provider.relayer_register_pika import (
-    RelayerRegisterEvent as p_relayer_register,
-)
+from src.relayer.application.listen_events import ListenEvents  # noqa: E402
+from src.relayer.provider.relayer_blockchain_web3 import RelayerBlockchainProvider  # noqa: E402
+from src.relayer.provider.relayer_register_aio_pika import RelayerRegisterEvent  # noqa: E402
+from src.relayer.provider.relayer_repository_leveldb import RelayerRepositoryProvider  # noqa: E402
 
 
-def app(chain_id: int, debug: bool = False) -> None:
+async def app(chain_id: int, debug: bool = False) -> None:
+    log_level = 'debug' if debug else 'info'
     # providers
-    rb_provider = p_relayer_blockchain(debug=debug)
-    rr_provider = p_relayer_register(debug=debug)
-    
+    relayer_blockchain_provider = RelayerBlockchainProvider()
+    relayer_register_provider = RelayerRegisterEvent()
+    relayer_repository_provider = RelayerRepositoryProvider()
+
     # Call apps
-    apps = App(
-        relayer_blockchain_provider=rb_provider,
-        relayer_register_provider=rr_provider
+    listener =  ListenEvents(
+        chain_id=chain_id,
+        relayer_blockchain_provider=relayer_blockchain_provider,
+        relayer_register_provider=relayer_register_provider,
+        relayer_repository_provider=relayer_repository_provider,
+        log_level=log_level,
     )
     
-    # Listen events
-    apps(chain_id=chain_id)
+    await listener(as_service=True, progress_bar=False)
 
 
 class Parser:
@@ -45,23 +46,23 @@ class Parser:
             description="Blockchain event listener.",
             epilog=dedent(f'''\
                 examples:
-                  Run the listener
-                  
+                    Run the listener
+
                     {self.exe} --chain_id 80002
 
             ''')
         )
-        
+
         self.parser.add_argument(
             '--chain_id', '-i',
-            action='store',            
+            action='store',
             help='A chain_id number. e.g: 80002')
-        
+
         self.parser.add_argument(
             '--debug', '-d',
             action="store_true",
             help='enable debug')
-        
+
     def __call__(self) -> Namespace:
         """Parse arguments."""
         args: Namespace = self.parser.parse_args()
@@ -74,10 +75,11 @@ if __name__ == "__main__":
         args: Namespace = parser()
 
         if args.chain_id:
-            app(chain_id=int(args.chain_id), debug=args.debug)
+            asyncio.run(app(chain_id=int(args.chain_id), debug=args.debug))
+
         else:
-            print(f"[ 💔 ] chain_id is missing!\n")
+            print("[ 💔 ] chain_id is missing!\n")
             parser.parser.print_help()
-            
+
     except Exception as exc:
         print(f'{exc}')

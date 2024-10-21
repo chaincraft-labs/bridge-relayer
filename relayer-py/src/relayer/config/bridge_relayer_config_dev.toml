@@ -1,58 +1,74 @@
 [environment]
 mode = "dev"
+data_path = "data"
+repository = "bridge.dev"
 
 [relayer_blockchain]
-    
-    [relayer_blockchain.ChainId80002]
-    rpc_url = "https://polygon-amoy.g.alchemy.com/v2/"
-    project_id = "{{ PROJECT_ID_80002 }}"
-    pk = "{{ PK_80002 }}"
-    wait_block_validation = 6
-    smart_contract_address = "0x6dC7CfE7Ce3c4d071fABC7B616E94fBba361B212"
-    genesis_block = 8267279
-    client = "middleware"
-    
-    [relayer_blockchain.ChainId411]
-    rpc_url = "https://polygon-amoy.g.alchemy.com/v2/"
-    project_id = "{{ PROJECT_ID_411 }}"
-    pk = "{{ PK_411 }}"
-    wait_block_validation = 6
-    smart_contract_address = "0x59043E352D80B5FDaE9f72e09Db06A7b92913d9E"
-    genesis_block = 8300960
-    client = "middleware"
-    
-    [relayer_blockchain.ChainId441]
-    rpc_url = "https://harmonie-endpoint-02.allfeat.io/"
-    project_id = "{{ PROJECT_ID_441 }}"
-    pk = "{{ PK_441 }}"
-    wait_block_validation = 6
-    smart_contract_address = "0x55e05213724f97c5C1ee976B5a219a7eB54EE1F1"
-    genesis_block = 1015519
+    # Allfet local node
+    [relayer_blockchain.ChainId440]
+    rpc_url = "{{ RPC_URL_440 }}"
+    project_id = "{{ PROJECT_ID_440 }}"
+    pk = "{{ PK_440 }}"
+    wait_block_validation = 2
+    block_validation_second_per_block = 5
+    smart_contract_address = "{{ SMART_CONTRACT_ADDRESS_440 }}"
+    smart_contract_deployment_block = "{{ SMART_CONTRACT_DEPLOYMENT_BLOCK_440 }}"
     client = ""
 
-    # [relayer_blockchain.ChainId441]
-    # rpc_url = "https://harmonie-endpoint-02.allfeat.io/"
-    # project_id = "{{ PROJECT_ID_441 }}"
-    # pk = "{{ PK_441 }}"
-    # wait_block_validation = 6
-    # smart_contract_address = "0x58b7324824EBd640faE46f7A6c8Bc8Eb4a9Bc44a"
-    # genesis_block = 8267279
-    # client = ""
-
-    [relayer_blockchain.ChainId123]
-    rpc_url = "https://fake.rpc_url.org"
-    project_id = "{{ PROJECT_ID_123 }}"
-    pk = "{{ PK_123 }}"
-    wait_block_validation = 6
-        smart_contract_address = "0x1234567890abcdef1234567890abcdef12345678"
-    genesis_block = 123456789
+    # GETH node
+    [relayer_blockchain.ChainId1337]
+    rpc_url = "{{ RPC_URL_1337 }}"
+    project_id = "{{ PROJECT_ID_1337 }}"
+    pk = "{{ PK_1337 }}"
+    wait_block_validation = 2
+    block_validation_second_per_block = 12
+    smart_contract_address = "{{ SMART_CONTRACT_ADDRESS_1337 }}"
+    smart_contract_deployment_block = "{{ SMART_CONTRACT_DEPLOYMENT_BLOCK_1337 }}"
     client = "middleware"
 
-
 [relayer_register]
-# RabbitMQ Broker 
-host = "localhost"
-port = 5672
-user = "guest"
+# RabbitMQ Broker
+host = "{{ RELAYER_REGISTER_HOST }}"
+port = "{{ RELAYER_REGISTER_PORT }}"
+user = "{{ RELAYER_REGISTER_USER }}"
 password = "{{ RELAYER_REGISTER_PASSWORD }}"
-queue_name = "bridge.relayer.dev"
+queue_name = "{{ RELAYER_REGISTER_QUEUE_NAME }}"
+
+[relayer_event_rules]
+    [relayer_event_rules.OperationCreated]
+    origin = "chainIdFrom"
+    has_block_finality = true
+    chain_func_name = 'chainIdTo'
+    func_name = "sendFeesLockConfirmation"
+    depends_on = 'FeesDeposited'
+
+    [relayer_event_rules.FeesDeposited]
+    origin = "chainIdTo"
+    has_block_finality = true
+    chain_func_name = 'chainIdTo'
+    func_name = "sendFeesLockConfirmation"
+    depends_on = 'OperationCreated'
+
+    [relayer_event_rules.FeesDepositConfirmed]
+    origin = "chainIdTo"
+    has_block_finality = false
+    chain_func_name = 'chainIdFrom'
+    func_name = "receiveFeesLockConfirmation"
+
+    [relayer_event_rules.FeesLockedConfirmed]
+    origin = "chainIdFrom"
+    has_block_finality = false
+    chain_func_name = 'chainIdFrom'
+    func_name = "confirmFeesLockedAndDepositConfirmed"
+
+    [relayer_event_rules.FeesLockedAndDepositConfirmed]
+    origin = "chainIdFrom"
+    has_block_finality = false
+    chain_func_name = 'chainIdTo'
+    func_name = "completeOperation"
+
+    [relayer_event_rules.OperationFinalized]
+    origin = "chainIdTo"
+    has_block_finality = false
+    chain_func_name = 'chainIdFrom'
+    func_name = "receivedFinalizedOperation"
