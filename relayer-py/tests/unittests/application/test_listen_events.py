@@ -271,7 +271,7 @@ def test_show_cli_title(listen_events):
                 f"{'chain_id':<{expected_title_length}} : {listen_events.chain_id}\n"
                 f"{'Account address':<{expected_title_length}} : {listen_events.blockchain_provider.get_account_address()}\n"
                 f"{'Contract address':<{expected_title_length}} : {listen_events.blockchain_config.smart_contract_address}\n"
-                f"{'Contract deployment block':<{expected_title_length}} : {listen_events.blockchain_config.smart_contract_deployment_block}\n"
+                f"{'Deployment block':<{expected_title_length}} : {listen_events.blockchain_config.smart_contract_deployment_block}\n"
                 f"{'start_block':<{expected_title_length}} : {start_block}\n"
                 f"{'end_block':<{expected_title_length}} : {end_block}\n"
                 f"{'blocks_to_scan':<{expected_title_length}} : {blocks_to_scan}\n"

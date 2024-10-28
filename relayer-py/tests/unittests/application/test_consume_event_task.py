@@ -316,6 +316,94 @@ async def test_save_event_operation_save_bridge_task_raise_exception(
         )
 
 # -------------------------------------------------------
+# Test calculate_wait_block_validation
+# mamage calcul
+# manage RelayerConfigBlockchainDataMissing
+# -------------------------------------------------------
+@pytest.mark.parametrize('params', [
+    {
+        # block_finality - current_block_number = 6
+        'wait_block_validation': 6,
+        'block_validation_second_per_block': 12,
+        'current_block_number': 123111,
+        'block_finality': 123117,
+        'expected': 60
+    },
+    {
+        # block_finality - current_block_number = 2 (>1)
+        'wait_block_validation': 6,
+        'block_validation_second_per_block': 12,
+        'current_block_number': 123115,
+        'block_finality': 123117,
+        'expected': 12
+    },
+    {
+        # block_finality - current_block_number = 1
+        'wait_block_validation': 6,
+        'block_validation_second_per_block': 12,
+        'current_block_number': 123116,
+        'block_finality': 123117,
+        'expected': int(12 / 2)
+    },
+    {
+        # block_finality - current_block_number = 1
+        'wait_block_validation': 6,
+        'block_validation_second_per_block': 0,
+        'current_block_number': 123116,
+        'block_finality': 123117,
+        'expected': 1
+    },
+    
+])
+def test_calculate_wait_block_validation(
+    blockchain_config,
+    example_event,
+    config,
+    params,
+):
+    """Test calculate_wait_block_validation."""
+    blockchain_config.wait_block_validation = params['wait_block_validation']
+    blockchain_config.block_validation_second_per_block = params['block_validation_second_per_block']
+
+    config.get_blockchain_config = MagicMock(return_value=blockchain_config)
+
+    with patch(f'{PATH_APP}.Config', return_value=config):
+        app = ConsumeEvents(
+            relayer_blockchain_provider=RelayerBlockchainProvider,
+            relayer_register_provider=RelayerRegisterProvider,
+            relayer_repository_provider=RelayerRepositoryProvider,
+            sleep=1,
+            allocated_time=1200,
+            log_level="INFO",
+        )
+        app.get_current_block_number = MagicMock(return_value=params['current_block_number'])
+
+        wait = app.calculate_wait_block_validation(
+            event=example_event,
+            block_finality=params['block_finality'],
+        )
+        assert wait == params['expected']
+
+
+def test_calculate_wait_block_validation_raise_exception(
+    consume_events,
+    example_event
+):
+    """
+    Test calculate_block_finality.
+    
+    manage RelayerConfigBlockchainDataMissing
+    """
+    consume_events.config.get_blockchain_config = MagicMock()
+    consume_events.config.get_blockchain_config.side_effect = RelayerConfigBlockchainDataMissing("Error")
+
+    with pytest.raises(RelayerCalculateBLockFinalityError):
+        consume_events.calculate_wait_block_validation(
+            event=example_event,
+            block_finality=123456,
+        )
+
+# -------------------------------------------------------
 # Test calculate_block_finality
 # mamage calcul
 # manage RelayerConfigBlockchainDataMissing
@@ -371,20 +459,21 @@ async def test_validate_block_finality(
     Wait for n seconds between each check
     For testing wait is 0 seconds
     """
-    def increment_current_block():
+    def increment_current_block(any):
         global current_block
         current_block += 1
         return current_block
 
-    consume_events.blockchain_provider.get_current_block_number = MagicMock()
-    consume_events.blockchain_provider.get_current_block_number.side_effect = increment_current_block
+    consume_events.calculate_wait_block_validation = MagicMock(return_value=0)
+    consume_events.get_current_block_number = MagicMock()
+    consume_events.get_current_block_number.side_effect = increment_current_block
+
     block_number = await consume_events.validate_block_finality(
         event=example_event,
         block_finality=10,
-        block_finality_in_sec=0
     )
 
-    consume_events.blockchain_provider.get_current_block_number.call_count == 11
+    consume_events.get_current_block_number.call_count == 11
     assert block_number == 11
 
 @pytest.mark.asyncio
@@ -397,14 +486,13 @@ async def test_validate_block_finality_raise_exception(
     raise RelayerBlockFinalityTimeExceededError
     """
     consume_events.allocated_time = 0
-    consume_events.blockchain_provider.get_current_block_number = MagicMock()
-    consume_events.blockchain_provider.get_current_block_number.return_value = 5
+    consume_events.get_current_block_number = MagicMock()
+    consume_events.get_current_block_number.return_value = 5
     
     with pytest.raises(RelayerBlockFinalityTimeExceededError):
         await consume_events.validate_block_finality(
             event=example_event,
             block_finality=10,
-            block_finality_in_sec=0
         )
 
 # -------------------------------------------------------
@@ -420,12 +508,14 @@ async def test_manage_validate_block_finality(
     """
     consume_events.calculate_block_finality = MagicMock()
     consume_events.calculate_block_finality.return_value = (123117, 0)
+
     consume_events.validate_block_finality = AsyncMock()
     consume_events.validate_block_finality.return_value = 123117
 
     block_number = await consume_events.manage_validate_block_finality(
         event=example_event
     )
+
     assert block_number == 123117
     consume_events.calculate_block_finality.assert_called_once_with(
         event=example_event
@@ -433,7 +523,6 @@ async def test_manage_validate_block_finality(
     consume_events.validate_block_finality.assert_called_once_with(
         event=example_event,
         block_finality=123117,
-        block_finality_in_sec=0
     )
 
 @pytest.mark.asyncio

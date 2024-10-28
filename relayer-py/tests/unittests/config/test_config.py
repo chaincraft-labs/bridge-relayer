@@ -12,13 +12,14 @@ from src.relayer.config.config import (
     FILE_TOML_PRD,
     Config,
     Singleton,
+    convert_error_to_hex,
     get_root_path,
     read_abis,
 )
 from src.relayer.domain.config import (
     EventRuleConfig, 
     RelayerBlockchainConfigDTO, 
-    RelayerRegisterConfigDTO
+    RelayerRegisterConfigDTO,
 )
 
 from src.relayer.domain.exception import (
@@ -234,6 +235,49 @@ def abis():
         ],
     }
 
+@pytest.fixture(scope="function")
+def abis_data():
+    return {
+        "1": [
+            {
+                "inputs": [
+                    {
+                        "internalType": "address",
+                        "name": "storageAddress",
+                        "type": "address"
+                    }
+                ],
+                "stateMutability": "nonpayable",
+                "type": "constructor"
+            },
+            {
+                "inputs": [],
+                "name": "RelayerBase__BlockConfirmationNotReached",
+                "type": "error"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "string",
+                        "name": "role",
+                        "type": "string"
+                    }
+                ],
+                "name": "RelayerBase__CallerHasNotRole",
+                "type": "error"
+            },
+            {
+                "inputs": [],
+                "name": "RelayerBase__InvalidOperationHash",
+                "type": "error"
+            },
+        ],
+        "2": [
+            {
+
+            }
+        ],
+    }
 
 # --------------------------------------------------------------------
 # T E S T S
@@ -482,6 +526,14 @@ def test_read_abis_key_error(mock_open_file, mock_get_abi_file):
 
     mock_open_file.assert_called_once_with("r")
 
+
+def test_convert_error_to_hex():
+    """Test convert_error_to_hex"""
+    expected = '0x6997e49b'
+    error_name = 'RelayerBase__BlockConfirmationNotReached'
+    assert convert_error_to_hex(error_name) == expected
+
+
 # -------------------------------------------
 # Config class
 # -------------------------------------------
@@ -499,9 +551,6 @@ def test_config_init_raise_exception_1(
     Singleton._instances = {}
     with pytest.raises(RelayerConfigError):
         Config()
-
-
-
 
 @pytest.mark.parametrize("exception", [
     RelayerConfigABIFileMissing,
@@ -803,7 +852,8 @@ def test_get_data_path_success(
 def test_get_repository_name_success(
     mock_read_abis,
     mock_get_bridge_relayer_config,
-    bridge_relayer_config
+    bridge_relayer_config,
+    abis
 ):
     """Test get_repository_name"""
 
@@ -815,3 +865,26 @@ def test_get_repository_name_success(
     result = config.get_repository_name()
 
     assert result == bridge_relayer_config['environment']['repository']
+
+
+
+@patch(f"{MODULE_PATH}.get_bridge_relayer_config")
+@patch(f"{MODULE_PATH}.read_abis")
+def test_get_smart_contract_errors_success(
+    mock_read_abis,
+    mock_get_bridge_relayer_config,
+    bridge_relayer_config,
+    abis_data
+):
+    """Test get_repository_name"""
+    expected = {
+        '0x6997e49b': 'RelayerBase__BlockConfirmationNotReached',
+        '0x127ad5d9': 'RelayerBase__CallerHasNotRole',
+        '0xdd72e359': 'RelayerBase__InvalidOperationHash'
+    },
+
+    Config._instances = {}
+    mock_read_abis.return_value = abis_data
+    mock_get_bridge_relayer_config.return_value = bridge_relayer_config
+    config = Config()
+    config.get_smart_contract_errors(chain_id=1) == expected

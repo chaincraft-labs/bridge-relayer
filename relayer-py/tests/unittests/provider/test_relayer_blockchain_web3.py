@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import re
 from unittest.mock import MagicMock, patch
 from eth_typing import ABIEvent
 from hexbytes import HexBytes
@@ -228,6 +229,15 @@ def bridge_relayer_config():
     blockchain_config.update({"abi": [{}], "chain_id": 1})
     return RelayerBlockchainConfigDTO(**blockchain_config)
 
+@pytest.fixture(scope="function")
+def contract_errors():
+    return {
+        '0x6997e49b': 'RelayerBase__BlockConfirmationNotReached',
+        '0x127ad5d9': 'RelayerBase__CallerHasNotRole',
+        '0xdd72e359': 'RelayerBase__InvalidOperationHash'
+    }
+
+
 @pytest.fixture
 def example_event_dto():
     """Create an example event."""
@@ -327,6 +337,31 @@ def test_build_tx_raise_exception(
             raise Exception('Error')
         
     with pytest.raises(RelayerBlockchainBuildTxError):
+        mock_provider._build_tx(
+            func=MockW3Contract,
+            params=example_bridge_task_action.params,
+            account_address="0x0000000000000000000000000000000000000000",
+            nonce=1,
+        )
+
+def test_build_tx_raise_exception_manage_contract_error(
+    mock_provider, 
+    example_bridge_task_action,
+    contract_errors,
+):
+    """
+        Test _build_tx that raise RelayerBlockchainBuildTxError
+    """
+    mock_provider.errors = contract_errors
+    class MockW3Contract:
+        def __init__(self, **kwargs):
+            pass
+        def build_transaction(self, **kwargs):
+            raise Exception(('0x6997e49b', '0x6997e49b'))
+    
+    expected = "Build transaction failed! error=('0x6997e49b', 'RelayerBase__BlockConfirmationNotReached')"
+
+    with pytest.raises(RelayerBlockchainBuildTxError, match=re.escape(expected)):
         mock_provider._build_tx(
             func=MockW3Contract,
             params=example_bridge_task_action.params,
@@ -582,7 +617,8 @@ def test_create_event_data_dto(
 # -------------------- connect_client --------------------------------
 def test_connect_client(
     mock_provider,
-    bridge_relayer_config
+    bridge_relayer_config,
+    contract_errors
 ):
     """
         Test connect_client that 
@@ -595,11 +631,13 @@ def test_connect_client(
     mock_provider.config.get_blockchain_config = MagicMock(
         return_value=bridge_relayer_config
     )
+    mock_provider.config.get_smart_contract_errors = MagicMock(
+        return_value=contract_errors
+    )
     mock_web3 = MagicMock(spec=Web3)
     mock_w3_contract = MagicMock(spec=Contract)
     mock_provider._set_provider = MagicMock(return_value=mock_web3)
     mock_provider._set_contract = MagicMock(return_value=mock_w3_contract)
-
 
     # act
     mock_provider.connect_client(chain_id)
@@ -608,6 +646,7 @@ def test_connect_client(
     assert mock_provider.relay_blockchain_config == bridge_relayer_config
     assert mock_provider.w3 == mock_web3
     assert mock_provider.w3_contract == mock_w3_contract
+    assert mock_provider.errors == contract_errors
 
 # -------------------- set_event_filter ------------------------------
 def test_set_event_filter(
