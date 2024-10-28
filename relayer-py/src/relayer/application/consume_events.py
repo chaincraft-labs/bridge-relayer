@@ -384,18 +384,61 @@ class ConsumeEvents(RelayerLogging, BaseApp):
         """
         return self._chain_connector(chain_id).get_current_block_number()
 
+    def calculate_wait_block_validation(
+        self,
+        event: EventDTO,
+        block_finality: int,
+    ) -> int:
+        """Calculate the wait block validation.
+
+        Args:
+            event (EventDTO): The event data
+            block_finality (int): The block finality
+
+        Raises:
+            RelayerCalculateBLockFinalityError
+
+        Returns:
+            int: The wait block validation in second
+        """
+        try:
+            cfg: RelayerBlockchainConfigDTO = \
+                self.config.get_blockchain_config(event.chain_id)
+            
+            current_block_number = self.get_current_block_number(event.chain_id)
+            block_diff = block_finality - current_block_number
+
+            if block_diff == cfg.wait_block_validation:
+                return cfg.wait_block_validation * \
+                    cfg.block_validation_second_per_block - \
+                        cfg.block_validation_second_per_block
+            elif block_diff > 1:
+                return cfg.block_validation_second_per_block
+            else:
+                return int(cfg.block_validation_second_per_block / 2) or 1
+
+        except RelayerConfigBlockchainDataMissing as e:
+            msg = (
+                f"Invalid chain ID {event.chain_id}. Check "
+                f"toml configuration file to identify the "
+                f"available chain IDs. error={e}"
+            )
+            self.logger.error(
+                f"{self.Emoji.fail.value}chain_id={event.chain_id} {msg}"
+            )
+            raise RelayerCalculateBLockFinalityError(msg)
+
+
     async def validate_block_finality(
         self,
         event: EventDTO,
         block_finality: int,
-        block_finality_in_sec: int,
     ) -> None:
         """Validate the block finality.
 
         Args:
             event (EventDTO): The event data
             block_finality (int): The block number finality target
-            block_finality_in_sec (int): The block finality in second
 
         Raises:
             RelayerBlockFinalityTimeExceededError:
@@ -424,11 +467,18 @@ class ConsumeEvents(RelayerLogging, BaseApp):
                 )
 
             if block_number <= block_finality:
+                # override block_finality_in_sec
+                block_finality_in_sec = self.calculate_wait_block_validation(
+                    event=event, 
+                    block_finality=block_finality
+                )
+
                 msg = (
                     f"Wait for block finality {block_number}/{block_finality} "
                     f"block_finality_in_sec={block_finality_in_sec}"
                 )
                 self.logger.info(f"{self.Emoji.wait.value}{id_msg}{msg}")
+
                 await asyncio.sleep(block_finality_in_sec)
                 elapsed_time += block_finality_in_sec | 1
                 block_number = self.get_current_block_number(event.chain_id)
@@ -461,7 +511,6 @@ class ConsumeEvents(RelayerLogging, BaseApp):
             return await self.validate_block_finality(
                 event=event,
                 block_finality=block_finality,
-                block_finality_in_sec=block_finality_in_sec
             )
 
         except (
