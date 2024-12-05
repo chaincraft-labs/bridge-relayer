@@ -40,12 +40,10 @@ python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install poetry==1.8.3
-poetry install 
+poetry install
 ```
 
 #### Environment files
-
-The 'relayer-py' folder must contain 3 environment file as described below:
 
 - `.env`             : Enable the production or development environment
 - `.env.config.dev`  : Development environment settings
@@ -95,7 +93,6 @@ Open a terminal and execute:
 
 ```bash
 # Allfeat local node
-cd relayer-py
 poetry run python bin/event_listener.py --chain_id 440
 ```
 
@@ -103,7 +100,6 @@ In the second terminal execute:
 
 ```bash
 # Geth local node
-cd relayer-py
 poetry run python bin/event_listener.py --chain_id 1337
 ```
 
